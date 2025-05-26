@@ -108,7 +108,7 @@ void mark_and_sweep()
     tag(indx) = CELL;
   /* The symbol table is rebuilt. */
   for (i = 0; i < SYMBOLTABLE_SIZE; i++)
-    symbol_table[i] = 0;
+    symbol_table[i] = Nil;
   /* Scanning the S-expression, remove cells with a negative ID, and re-add the symbols to the empty table. */
   purseS(environment);
   for (i = 0; i < Last; i++) /* 0 to 'Last'-1 are the indexes of reserved symbols */
@@ -121,7 +121,7 @@ void mark_and_sweep()
     if (tag(indx) < 0)
     {
       tag(indx) = CELL;
-      car(indx) = 0;
+      car(indx) = Nil;
       cdr(indx) = freecells;
       freecells = indx;
     }

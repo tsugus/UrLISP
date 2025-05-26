@@ -21,7 +21,7 @@
 /* Macro for global escape in case of error */
 #define ec \
   if (err) \
-  return (0)
+  return Nil
 
 enum ID
 {

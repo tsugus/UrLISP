@@ -38,16 +38,16 @@ void initCells()
   /* Freecell linking */
   for (indx = 0; indx < CELLS_SIZE - 1; indx++)
   {
-    car(indx) = 0;
+    car(indx) = Nil;
     cdr(indx) = indx + 1;
     tag(indx) = CELL;
   }
-  car(CELLS_SIZE - 1) = 0;
-  cdr(CELLS_SIZE - 1) = 0;
+  car(CELLS_SIZE - 1) = Nil;
+  cdr(CELLS_SIZE - 1) = Nil;
 
   /* Initializing the symbol table */
   for (i = 0; i < SYMBOLTABLE_SIZE; i++)
-    symbol_table[i] = 0;
+    symbol_table[i] = Nil;
 
   /* Initializing the top position of freecells */
   freecells = Last; /* Indexes smaller than 'Last' are reserved. */
@@ -56,12 +56,12 @@ void initCells()
   sp = 0;
 
   /* Initializing the environment list */
-  environment = 0;
+  environment = Nil;
 
   /* Registering 'nil' */
-  tag(0) = NIL;
-  car(0) = 0;
-  cdr(0) = 0;
+  tag(Nil) = Nil;
+  car(Nil) = Nil;
+  cdr(Nil) = Nil;
 
   /* Registering system symbols */
   gc_addSystemSymbol(T, "t");
@@ -126,7 +126,7 @@ void greeting()
   printf("\n");
   printf("\t  A Minimal Pure LISP Interpreter  \n\n");
   printf("\t            U r L I S P            \n\n");
-  printf("\t           Version 0.3.5           \n");
+  printf("\t           Version 0.3.6           \n");
   printf("\tThis software is released under the\n");
   printf("\t            MIT License.           \n\n");
   printf("\t                     (C) 2025 Tsugu\n\n");
@@ -138,13 +138,13 @@ int main()
   if (tags == NULL)
   {
     printf("Unable to secure a cell area.\n");
-    return 0;
+    return Nil;
   }
   cells = (Cell *)malloc(sizeof(Cell) * CELLS_SIZE);
   if (cells == NULL)
   {
     printf("Unable to secure a cell area.\n");
-    return 0;
+    return Nil;
   }
   ifp = stdin;
   initCells();
@@ -152,7 +152,7 @@ int main()
   if (ifp == NULL)
   {
     printf("\"init.txt\" is missing. Please prepare an empty init.txt file.\n");
-    return 0;
+    return Nil;
   }
   err = off;
   top_loop();

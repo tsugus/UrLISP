@@ -16,7 +16,7 @@ Index error(char *str)
     message = str;
   }
   sp = 0;
-  return 0;
+  return Nil;
 }
 
 Index eof_error()
@@ -24,7 +24,7 @@ Index eof_error()
   err = eof;
   message = "EOF was entered.";
   sp = 0;
-  return 0;
+  return Nil;
 }
 
 Index gc_getFreeCell()
@@ -35,7 +35,7 @@ Index gc_getFreeCell()
   {
     indx = freecells;
     freecells = cdr(freecells);
-    cdr(indx) = 0;
+    cdr(indx) = Nil;
   }
   else
   {
@@ -46,7 +46,7 @@ Index gc_getFreeCell()
     {
       indx = freecells;
       freecells = cdr(freecells);
-      cdr(indx) = 0;
+      cdr(indx) = Nil;
     }
   }
   return indx;
@@ -96,7 +96,7 @@ Index gc_strToName(char *str)
   if (j < sizeof(Index))
     for (i = j; i < sizeof(Index); i++)
       (cas(indx2))[i] = '\0';
-  cdr(indx2) = 0;
+  cdr(indx2) = Nil;
   pop();
   return indx;
 }
@@ -109,7 +109,7 @@ void nameToStr(Index indx, char *str)
     if (j == sizeof(Index))
     {
       indx = cdr(indx);
-      if (indx == 0)
+      if (indx == Nil)
         break;
       j = 0;
     }
@@ -158,7 +158,7 @@ Index findSymbol(int hash_n, char *name)
   char strbuf[TEXTBUF_SIZE];
 
   symbol = symbol_table[hash_n];
-  while (symbol) /* If not found, returns 0. */
+  while (symbol) /* If not found, returns Nil. */
   {
     nameToStr(car(symbol), strbuf);
     if (!strcmp(strbuf, name))
@@ -215,7 +215,7 @@ Index gc_makeatom_sub(char *str)
   car(cell) = gc_getSymbol();
   ec;
   txtp = ++txtp2;
-  car(cell2) = gc_readS(0);
+  car(cell2) = gc_readS(Nil);
   ec;
   cdr(cell) = cell2;
   pop();
@@ -282,13 +282,13 @@ Index gc_makeList(int from_top)
   if (*txtp == ')')
   {
     txtp++;
-    return 0;
+    return Nil;
   }
   if (*txtp == ']')
   {
     if (super_bracket || from_top)
       txtp++;
-    return 0;
+    return Nil;
   }
   if (*txtp == '.')
     return error("There is no \"car\" of the dotted pair.");
@@ -296,7 +296,7 @@ Index gc_makeList(int from_top)
   ec;
   push(indx);
   ec;
-  car(indx2) = gc_readS(0);
+  car(indx2) = gc_readS(Nil);
   ec;
   if (!skipspace())
   {
@@ -318,7 +318,7 @@ Index gc_makeList(int from_top)
         pop();
         return error("There is no \"cdr\" of the dotted pair.");
       }
-      cdr(indx2) = gc_readS(0);
+      cdr(indx2) = gc_readS(Nil);
       ec;
       if (!skipspace())
       {
@@ -335,7 +335,7 @@ Index gc_makeList(int from_top)
     indx3 = gc_getFreeCell();
     ec;
     cdr(indx2) = indx3;
-    car(indx3) = gc_readS(0);
+    car(indx3) = gc_readS(Nil);
     ec;
     indx2 = indx3;
     if (!skipspace())

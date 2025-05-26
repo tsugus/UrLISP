@@ -288,7 +288,7 @@ Index cls()
   printf("\033[2J");   /* Clear the screen. */
   printf("\033[0;0H"); /* Move the cursor to (0,0). */
   err = print_no_more;
-  return 0;
+  return Nil;
 }
 
 Index apply(Index func, Index args, Index env)
