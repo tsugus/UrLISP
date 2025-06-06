@@ -355,7 +355,7 @@ Index gc_makeList(int from_top)
   return indx;
 }
 
-Index gc_readS(Index from_top)
+Index gc_readS(int from_top)
 {
   if (!skipspace())
     return eof_error();

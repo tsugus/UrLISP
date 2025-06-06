@@ -113,7 +113,7 @@ Index gc_makeSymbol(char *);
 Index addSymbol(int, Index);
 int hash(char *);
 Index findSymbol(int, char *);
-Index gc_readS(Index);
+Index gc_readS(int);
 void printS(Index);
 /* From "GC.C" */
 Index push(Index);
