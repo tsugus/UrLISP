@@ -12,16 +12,16 @@
   if (!is(x, CELL) || !is(cdr(x), CELL)) \
   return error("Not enough arguments")
 
-void print_error(Index form, char *msg)
+void print_error(Index exp, char *msg)
 {
   printf("%s\n", msg);
   printf("At ");
-  printS(form);
+  printS(exp);
   putchar('\n');
   err = print_no_more;
 }
 
-Index error_(Index code, Index form)
+Index error_(Index code, Index exp)
 {
   switch (code)
   {
@@ -35,7 +35,7 @@ Index error_(Index code, Index form)
     printf("Error");
   }
   printf(": ");
-  printS(form);
+  printS(exp);
   putchar('\n');
   err = print_no_more;
   return Nil;
@@ -210,27 +210,27 @@ Index evlist(Index members, Index env)
   return rev_append(indx, Nil);
 }
 
-Index eval(Index form, Index env)
+Index eval(Index exp, Index env)
 {
   Index result;
 
-  push(form);
+  push(exp);
   ec;
   push(env);
   ec;
-  if (form == T)
+  if (exp == T)
     result = T;
-  else if (form == Nil)
+  else if (exp == Nil)
     result = Nil;
-  else if (atom(form) == T)
-    result = assoc(form, env);
-  else if (isSUBR(car(form)) == T)
-    result = apply(car(form), evlist(cdr(form), env), env);
+  else if (atom(exp) == T)
+    result = assoc(exp, env);
+  else if (isSUBR(car(exp)) == T)
+    result = apply(car(exp), evlist(cdr(exp), env), env);
   else
-    result = apply(car(form), cdr(form), env);
+    result = apply(car(exp), cdr(exp), env);
   if (err == on)
   {
-    print_error(form, message);
+    print_error(exp, message);
     return Nil;
   }
   pop();
