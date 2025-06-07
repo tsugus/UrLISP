@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "LISP.H"
 #define check_1_arg(x) \
   if (!is(x, CELL))    \
@@ -175,6 +176,9 @@ Index isSUBR(Index x)
   case Apply:
   case Error:
   case Len:
+  case Read:
+  case Display:
+  case Prompt:
     return T;
   default:
     return Nil;
@@ -291,6 +295,19 @@ Index cls()
   return Nil;
 }
 
+Index display(Index indx)
+{
+  printS(indx);
+  return Nullchar;
+}
+
+Index promptt(Index atom)
+{
+  nameToStr(car(atom), namebuf);
+  strcpy(prompt, namebuf);
+  return T;
+}
+
 Index apply(Index func, Index args, Index env)
 {
   if (atom(func) == T && func != Nil)
@@ -370,6 +387,14 @@ Index apply(Index func, Index args, Index env)
       return quit();
     case Cls:
       return cls();
+    case Read:
+      return gc_readS(1);
+    case Display:
+      check_1_arg(args);
+      return display(car(args));
+    case Prompt:
+      check_1_arg(args);
+      return promptt(car(args));
     default:
       return eval(cons(assoc(func, env), args), env);
     }

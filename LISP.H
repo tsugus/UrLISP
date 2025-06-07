@@ -11,6 +11,7 @@
 #define STACK_SIZE 0x4000   /* Size of the stack for Gabage Collection */
 #define TEXTBUF_SIZE 100    /* Input text buffer */
 #define SYMBOLTABLE_SIZE 64 /* Size of the hash table for symbols */
+#define PROMPT_LEN 11       /* The length of the prompt */
 #define tag(x) (tags[x])    /* Tag to store ID */
 #define car(x) (cells[x].pair.car).index
 #define cdr(x) (cells[x].pair.cdr).index
@@ -56,6 +57,12 @@ enum name
   Len,
   Quit,
   Cls,
+  Read,
+  Display,
+  Prompt,
+  Nullchar,
+  Whitespace,
+  Newline,
   Num1,
   Num2,
   Last
@@ -102,6 +109,7 @@ extern FILE *ifp;
 extern int sp;            /* The stack pointer for GC */
 extern Index environment; /* The Environment list */
 extern int no_input_after_GC;
+extern char prompt[PROMPT_LEN]; /* The prompt */
 #endif
 
 /* From "IO.C" */

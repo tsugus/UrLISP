@@ -5,6 +5,7 @@
 #define MAIN
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "LISP.H"
 
 char textbuf[TEXTBUF_SIZE];
@@ -21,6 +22,7 @@ FILE *ifp;
 int sp;
 Index environment;
 int no_input_after_GC;
+char prompt[PROMPT_LEN]; /* The prompt */
 
 /* Give a name to the cell with index n, make it a symbol, and register it in the table. */
 void gc_addSystemSymbol(Index n, char *name)
@@ -87,6 +89,12 @@ void initCells()
   gc_addSystemSymbol(Len, "len");
   gc_addSystemSymbol(Quit, "quit");
   gc_addSystemSymbol(Cls, "cls");
+  gc_addSystemSymbol(Read, "read");
+  gc_addSystemSymbol(Prompt, "prompt");
+  gc_addSystemSymbol(Display, "display");
+  gc_addSystemSymbol(Nullchar, "\\0");
+  gc_addSystemSymbol(Whitespace, "\\s");
+  gc_addSystemSymbol(Newline, "\\n");
   gc_addSystemSymbol(Num1, "1");
   gc_addSystemSymbol(Num2, "2");
 }
@@ -126,7 +134,7 @@ void greeting()
   printf("\n");
   printf("\t  A Minimal Pure LISP Interpreter  \n\n");
   printf("\t            U r L I S P            \n\n");
-  printf("\t           Version 0.3.7           \n");
+  printf("\t           Version 0.4.0           \n");
   printf("\tThis software is released under the\n");
   printf("\t            MIT License.           \n\n");
   printf("\t                     (C) 2025 Tsugu\n\n");
@@ -148,6 +156,7 @@ int main()
   }
   ifp = stdin;
   initCells();
+  strcpy(prompt, "%\0");
   ifp = fopen("INIT.TXT", "r"); /* LISP programs to load at startup */
   if (ifp == NULL)
   {
