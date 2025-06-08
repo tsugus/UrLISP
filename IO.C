@@ -190,9 +190,18 @@ Index gc_getSymbol()
 
 void printSymbol(Index atom)
 {
-  if (atom == Nil) /* For nil display */
+  switch (atom)
   {
+  case Nil:
     printf("nil");
+    return;
+  case Nullchar:
+    return;
+  case Whitespace:
+    putchar(' ');
+    return;
+  case Newline:
+    putchar('\n');
     return;
   }
   nameToStr(car(atom), namebuf);
@@ -248,7 +257,7 @@ void printAtom(Index indx)
 
 char *getstr()
 {
-  printf("%% ");
+  printf("%s ", prompt);
   txtp = textbuf;
   *txtp = '\0';
   return fgets(textbuf, TEXTBUF_SIZE, ifp);

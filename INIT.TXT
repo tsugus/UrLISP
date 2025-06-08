@@ -1,5 +1,5 @@
 ;;;;; An Initial Program for UrLISP ;;;;;;
-;; Version 0.3.2
+;; Version 0.4.0
 ;; (C) 2025 Tsugu
 ;;;;;
 
@@ -11,7 +11,7 @@
 ;  quote('), atom, eq, car, cdr, cons, cond, eval, label, lambda
 
 ;; Unique Functions:
-;  importenv, exportenv, def, cls, quit, error
+;  importenv, exportenv, def, cls, quit, error, read, display, prompt
 
 ; -------------------------------------
 ;; Usage
@@ -22,7 +22,7 @@
 
 ; 'importenv', 'exportenv'
 (exportenv)             ; ==> nil
-(importenv '((x . a)))  ; ==> ((x . a))
+(importenv '((x . a)))  ; ==> t
 (exportenv)             ; ==> ((x . a))
 x                       ; ==> a
 
@@ -46,75 +46,28 @@ y            ; ==> b
 ; (cls)
 
 ; Exit UrLISP
-; (quit)
+; (exit)
 
-; -------------------------------------
-;; Functions of Puseud Numbers (inefficient!)
+; Display Errors
+(error '1 'exp)  ; ==> "Not found: exp"
+(error '2 'exp)  ; ==> "Invalid form: exp"
+(error '3 'exp)  ; ==> "Error: exp"
 
-(def +1
-  '(lambda (x) (cons 't x)))
+; Read a S-expression
+(read)
+(cdr
+ (1 2 3))
+; ==> (cdr (quote (1 2 3)))
 
-(def -1
-  '(lambda (x)
-     (cond ((eq #0 x) '())
-           (t (cdr x)))))
+; Display a S-expression
+(display '(cdr '(1 2 3)))  ; ==> (cdr (quote (1 2 3)))
+(display '\0)  ; ==> no character
+(display '\s)  ; ==> a white space
+(display '\n)  ; ==> a new line
 
-(def +
-  '(lambda (x y)
-     (cond ((eq #0 y) x)
-           (t (+ (+1 x) (-1 y))))))
-
-(def *
-  '(lambda (x y)
-     ((label *rec
-             (lambda (x y acc)
-               (cond ((eq #0 y) acc)
-                     (t (*rec x (-1 y) (+ acc x))))))
-      x y '())))
-
-(def -
-  '(lambda (x y)
-     (cond ((eq #0 y) x)
-           (t (- (-1 x) (-1 y))))))
-
-(def |-|
-  '(lambda (x y)
-     (+ (- x y) (- y x))))
-
-(def =
-  '(lambda (x y)
-     (eq #0 (|-| x y))))
-
-(def <
-  '(lambda (x y)
-     (cond ((- y x) 't))))
-
-(def >
-  '(lambda (x y)
-     (cond ((- x y) 't))))
-
-(def /
-  '(lambda (x y)
-     ((label /rec
-             (lambda (x y acc)
-               (cond ((< x y) acc)
-                     (t (/rec (- x y) y (+1 acc))))))
-      x y '())))
-
-(def %
-  '(lambda (x y)
-     (cond ((< x y) x)
-           ((= x y) #0)
-           (t (% (- x y) y)))))
-
-(def fibo
-  '(lambda (n)
-     ((label fibo-rec
-             (lambda (n pre sum)
-               (cond
-                 ((eq #0 n) sum)
-                 (t (fibo-rec (-1 n) sum (+ pre sum))))))
-      n #1 #0)))
+; Set the prompt
+(prompt '>>)  ; The prompt is '>>'.
+(prompt '%)   ; The prompt is '%'.
 
 ; =====================================
 ;; Meta-circular Evaluator
@@ -234,37 +187,173 @@ y            ; ==> b
     ))
 
 ; =====================================
-;; "Pseudo interpretor" functions
+;; Inner interpretor
+
+; Preparation
+;
+(def cadr '(lambda (x) (car (cdr x))))
+(def caddr '(lambda (x) (car (cdr (cdr x)))))
+;
+(def not
+  '(lambda (x)
+     (cond (x '()) (t 't))))
+;
+(def rev-append
+  '(lambda (x y)
+     (cond ((eq '() x) y)
+           (t (rev-append (cdr x) (cons (car x) y))))))
+;
+(def begin
+  '(lambda x (car (rev-append x '()))))
+;
+(def append
+  '(lambda (x y) (rev-append (rev-append x '()) y)))
 
 ; The global environment list '*env*'
 ;
-(def *env* (cons (cons '*env* plisp) plisp))
+(def *env* (cons (cons '*env* '()) '()))
 
 ; Add (x . y) to *env*.
 ;
 (def <<
   '(lambda (x y)
-     (cond
-       ((cond
-          ((rplacd *env* (cons (cons x y) (cdr *env*)))
-           (rplacd (car *env*) (cdr *env*))))
-        x))))
+     (begin
+       (rplacd *env* (cons (cons x y) (cdr *env*)))
+       (rplacd (car *env*) (cdr *env*))
+       x)))
 
 ; Eval x on the environment list.
 ;
 (def >> '(lambda (x) (eval x *env*)))
 
-; Reset *env*.
+; Import an environment.
 ;
-(def reset!
-  '(lambda ()
-     (cond
-       ((cond
-          ((rplacd *env* plisp)
-           (rplacd (car *env*) plisp)))
-        't))))
+(def importenv!
+  '(lambda (env)
+     (begin
+       (rplacd *env* env)
+       (rplacd (car *env*) env)
+       't)))
 
-; -------------------------------------
+; Export the environment.
+;
+(def exportenv!
+  '(lambda ()
+     env))
+
+; The holder of the top level S-expression
+;
+(def top '(()))
+
+; Inner REPL
+;
+(def repl-body
+  '(lambda (exp)
+     (begin
+       (cond
+         ((not (atom exp))
+          (cond
+            ((eq 'def (car exp))
+             (display (<< (cadr exp) (eval (caddr exp) *env*))))
+            (t (display (>> exp)))))
+         (t (display (>> exp))))
+       (display '\n))))
+;
+(def read-top
+  '(lambda ()
+     (begin
+       (prompt '>)
+       (rplaca top (read))
+       (prompt '%)
+       '\0)))
+;
+(def repl-loop
+  '(lambda ()
+     (begin
+       (repl-body (car top))
+       (repl))))
+;
+(def repl
+  '(lambda ()
+     (begin
+       (read-top)
+       (cond
+         ((not (atom (car top)))
+          (cond
+            ((not (eq 'exit (car (car top))))
+             (repl-loop))
+            (t '\0)))
+         (t (repl-loop))))))
+
+; =====================================
+;; Functions of Puseud Numbers (inefficient!)
+
+(def +1
+  '(lambda (x) (cons 't x)))
+
+(def -1
+  '(lambda (x)
+     (cond ((eq #0 x) '())
+           (t (cdr x)))))
+
+(def +
+  '(lambda (x y)
+     (cond ((eq #0 y) x)
+           (t (+ (+1 x) (-1 y))))))
+
+(def *
+  '(lambda (x y)
+     ((label *rec
+             (lambda (x y acc)
+               (cond ((eq #0 y) acc)
+                     (t (*rec x (-1 y) (+ acc x))))))
+      x y '())))
+
+(def -
+  '(lambda (x y)
+     (cond ((eq #0 y) x)
+           (t (- (-1 x) (-1 y))))))
+
+(def |-|
+  '(lambda (x y)
+     (+ (- x y) (- y x))))
+
+(def =
+  '(lambda (x y)
+     (eq #0 (|-| x y))))
+
+(def <
+  '(lambda (x y)
+     (cond ((- y x) 't))))
+
+(def >
+  '(lambda (x y)
+     (cond ((- x y) 't))))
+
+(def /
+  '(lambda (x y)
+     ((label /rec
+             (lambda (x y acc)
+               (cond ((< x y) acc)
+                     (t (/rec (- x y) y (+1 acc))))))
+      x y '())))
+
+(def %
+  '(lambda (x y)
+     (cond ((< x y) x)
+           ((= x y) #0)
+           (t (% (- x y) y)))))
+
+(def fibo
+  '(lambda (n)
+     ((label fibo-rec
+             (lambda (n pre sum)
+               (cond
+                 ((eq #0 n) sum)
+                 (t (fibo-rec (-1 n) sum (+ pre sum))))))
+      n #1 #0)))
+
+; =====================================
 ;; Puseud Numbers Test
 
 'Number_Test
@@ -296,107 +385,179 @@ y            ; ==> b
 ;; Test 1
 'Test_1
 
-(<< 'reverse2
-    '(lambda (x)
-       ((label
-         rec
-         (lambda (x y)
-           (cond ((null x) y)
-                 (t (rec (cdr x) (cons (car x) y))))))
-        x '())))
-(>> '(eval* '(reverse2 '(1 2 3 4 5 6 7 8 9 10)) *env*))
-(>> '(eval* 'reverse2 *env*))
-(reset!)
-(>> '(eval* 'reverse2 *env*))
-(>> '(eval* '(cddr '(a b c d e)) *env*))
+(importenv! plisp)
+(repl)
+(def reverse2
+  '(lambda (x)
+     ((label
+       rec
+       (lambda (x y)
+         (cond ((null x) y)
+               (t (rec (cdr x) (cons (car x) y))))))
+      x '())))
+(reverse2 '(1 2 3 4 5 6 7 8 9 10))
+(eval* '(reverse2 '(1 2 3 4 5 6 7 8 9 10)) *env*)
+(eval* 'reverse2 *env*)
+(exit)
+(importenv! plisp)
+(repl)
+(eval* 'reverse2 *env*)
+(repl)
+(eval* '(cddr '(a b c d e)) *env*)
+(exit)
 
 ; -------------------------------------
-;; Redefine
+;; plisp2
 
-(<< 'isSUBR
-    '(lambda (x)
-       (cond ((eq x 'atom) 't)
-             ((eq x 'eq) 't)
-             ((eq x 'car) 't)
-             ((eq x 'cdr) 't)
-             ((eq x 'cons) 't)
-             ((eq x 'eval*) 't)
-             ((eq x 'apply) 't)
-             ((eq x 'error) 't)
-             (t '()))))
-
-(<< 'apply*
-    '(lambda (func args env)
-       (cond
-         ((and (atom func) (not (null func)))
-          (cond
-            ((eq func 'quote) (car args))
-            ((eq func 'atom) (cond ((atom (car args)) 't)
-                                   (t '())))
-            ((eq func 'eq) (cond
-                             ((eq (car args) (cadr args)) 't)
-                             (t '())))
-            ((eq func 'car) (car (car args)))
-            ((eq func 'cdr) (cdr (car args)))
-            ((eq func 'cons) (cons (car args) (cadr args)))
-            ((eq func 'cond) (evcond args env))
-            ((eq func 'eval*) (eval* (car args) (cadr args)))
-            ((eq func 'apply) (apply* (car args) (cadr args) env))
-            ((eq func 'function) (list 'funarg (car args) env))
-            ((eq func 'funarg) (cons func args))
-            ((eq func 'error) (error (car args) (cadr args)))
-            (t (eval* (cons (assoc func env) args) env))))
-         ((eq (car func) 'label)
-          (eval* (cons (caddr func) args)
-                 (cons (cons (cadr func) (caddr func)) env)))
-         ((eq (car func) 'funarg)
-          (apply* (cadr func) args (caddr func)))
-         ((eq (car func) 'lambda)
-          (eval* (caddr func)
-                 (append (assoclist (cadr func) args) env)))
-         (t (error '2 (cons func args))))))
-
-(<< 'eval*
-    '(lambda (exp env)
-       (cond
-         ((eq exp 't) 't)
-         ((eq exp '()) '())
-         ((atom exp) (assoc exp env))
-         ((or (isSUBR (car exp))
-              (cond ((not (or (atom (car exp)) (null (car exp))))
-                     (or (eq (caar exp) 'funarg)
-                         (eq (caar exp) 'lambda)))))
-          (apply* (car exp) (evlist (cdr exp) env) env))
-         (t
-          (apply* (car exp) (cdr exp) env)))))
-
-; -------------------------------------
-;; Z-combinator
-
-(<< 'funcall
-    '(lambda (f . x) (apply f x)))
-
-(<< 'z-combi
-    '(lambda (f)
-       (funcall
-        #'(lambda (y) (f #'(lambda x (apply (y y) x))))
-        #'(lambda (y) (f #'(lambda x (apply (y y) x)))))))
+(def plisp2
+  '(
+    (caar . (lambda (x) (car (car x))))
+    (cadr . (lambda (x) (car (cdr x))))
+    (cdar . (lambda (x) (cdr (car x))))
+    (cddr . (lambda (x) (cdr (cdr x))))
+    (caaar . (lambda (x) (car (caar x))))
+    (caadr . (lambda (x) (car (cadr x))))
+    (cadar . (lambda (x) (car (cdar x))))
+    (caddr . (lambda (x) (car (cddr x))))
+    (cdaar . (lambda (x) (cdr (caar x))))
+    (cdadr . (lambda (x) (cdr (cadr x))))
+    (cddar . (lambda (x) (cdr (cdar x))))
+    (cdddr . (lambda (x) (cdr (cddr x))))
+    (caddar . (lambda (x) (car (cddar x))))
+    (list
+     . (lambda x x))
+    (null
+     . (lambda (x) (eq x '())))
+    (not
+     . (lambda (x)
+         (cond (x '()) (t 't))))
+    (and
+     . (lambda (x y)
+         (cond (x y) (t '()))))
+    (or
+     . (lambda (x y)
+         (cond (x 't) (t y))))
+    (imply
+     . (lambda (x y)
+         (cond (x y) (t 't))))
+    (rev-append
+     . (lambda (x y)
+         (cond ((null x) y)
+               (t (rev-append (cdr x) (cons (car x) y))))))
+    (reverse
+     . (lambda (x) (rev-append x '())))
+    (append
+     . (lambda (x y) (rev-append (rev-append x '()) y)))
+    (assoclist
+     . (lambda (keys values)
+         (cond ((or (null keys) (null values)) '())
+               ((and (not (atom keys)) (not (atom values)))
+                (cons (cons (car keys) (car values))
+                      (assoclist (cdr keys) (cdr values))))
+               ((not (null keys))
+                (list (cons keys values))))))
+    ; (error
+    ;  . (lambda (err-code s-exp)
+    ;      (Return a nil with outputing an error code and a S-expression.)))
+    (assoc
+     . (lambda (key lst)
+         (cond ((null lst) (error '1 key))
+               ((eq key (caar lst)) (cdar lst))
+               (t (assoc key (cdr lst))))))
+    (isSUBR
+     . (lambda (x)
+         (cond ((eq x 'atom) 't)
+               ((eq x 'eq) 't)
+               ((eq x 'car) 't)
+               ((eq x 'cdr) 't)
+               ((eq x 'cons) 't)
+               ((eq x 'eval*) 't)
+               ((eq x 'apply*) 't)
+               ((eq x 'error) 't)
+               (t '()))))
+    (evcond
+     . (lambda (clauses env)
+         (cond ((null clauses) '())
+               ((null (eval* (caar clauses) env))
+                (evcond (cdr clauses) env))
+               (t (eval* (cadar clauses) env)))))
+    (evlist
+     . (lambda (members env)
+         (cond ((null members) '())
+               (t (cons (eval* (car members) env)
+                        (evlist (cdr members) env))))))
+    (apply*
+     . (lambda (func args env)
+         (cond
+           ((and (atom func) (not (null func)))
+            (cond
+              ((eq func 'quote) (car args))
+              ((eq func 'atom) (cond ((atom (car args)) 't)
+                                     (t '())))
+              ((eq func 'eq) (cond
+                               ((eq (car args) (cadr args)) 't)
+                               (t '())))
+              ((eq func 'car) (car (car args)))
+              ((eq func 'cdr) (cdr (car args)))
+              ((eq func 'cons) (cons (car args) (cadr args)))
+              ((eq func 'cond) (evcond args env))
+              ((eq func 'eval*) (eval* (car args) (cadr args)))
+              ((eq func 'apply*) (apply* (car args) (cadr args) env))
+              ((eq func 'function) (list 'funarg (car args) env))
+              ((eq func 'funarg) (cons func args))
+              ((eq func 'error) (error (car args) (cadr args)))
+              (t (eval* (cons (assoc func env) args) env))))
+           ((eq (car func) 'label)
+            (eval* (cons (caddr func) args)
+                   (cons (cons (cadr func) (caddr func)) env)))
+           ((eq (car func) 'funarg)
+            (apply* (cadr func) args (caddr func)))
+           ((eq (car func) 'lambda)
+            (eval* (caddr func)
+                   (append (assoclist (cadr func) args) env)))
+           (t (error '2 (cons func args))))))
+    (eval*
+     . (lambda (exp env)
+         (cond
+           ((eq exp 't) 't)
+           ((eq exp '()) '())
+           ((atom exp) (assoc exp env))
+           ((or (isSUBR (car exp))
+                (cond ((not (or (atom (car exp)) (null (car exp))))
+                       (or (eq (caar exp) 'funarg)
+                           (eq (caar exp) 'lambda)))))
+            (apply* (car exp) (evlist (cdr exp) env) env))
+           (t
+            (apply* (car exp) (cdr exp) env)))))
+    (funcall
+     . (lambda (f . x) (apply* f x)))
+    (z-combi  ; Z-combinator
+     . (lambda (f)
+         (funcall
+          #'(lambda (y) (f #'(lambda x (apply* (y y) x))))
+          #'(lambda (y) (f #'(lambda x (apply* (y y) x)))))))
+    ))
 
 ; -------------------------------------
 ;; Test 2
 'Test_2
 
-(<< 'reverse_z
-    '(lambda (l)
-       (funcall
-        (z-combi
-         #'(lambda (f)
-             #'(lambda (l acc)
-                 (cond
-                   ((eq '() l) acc)
-                   (t (f (cdr l)
-                         (cons (car l) acc)))))))
-        l '())))
-(>> '(eval* '(reverse_z '(1 2 3 4 5 6 7 8 9 10)) *env*))
+(importenv! plisp2)
+(repl)
+(def reverse_z
+  '(lambda (l)
+     (funcall
+      (z-combi
+       #'(lambda (f)
+           #'(lambda (l acc)
+               (cond
+                 ((eq '() l) acc)
+                 (t (f (cdr l)
+                       (cons (car l) acc)))))))
+      l '())))
+(reverse_z '(1 2 3 4 5 6 7 8 9 10))
+(repl)
+(eval* '(reverse_z '(1 2 3 4 5 6 7 8 9 10)) *env*)
+(exit)
 
 ; -------------------------------------
