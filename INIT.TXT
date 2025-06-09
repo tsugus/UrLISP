@@ -1,5 +1,5 @@
 ;;;;; An Initial Program for UrLISP ;;;;;;
-;; Version 0.4.0
+;; Version 0.4.1
 ;; (C) 2025 Tsugu
 ;;;;;
 
@@ -239,7 +239,7 @@ y            ; ==> b
 ;
 (def exportenv!
   '(lambda ()
-     env))
+     *env*))
 
 ; The holder of the top level S-expression
 ;
@@ -253,6 +253,10 @@ y            ; ==> b
        (cond
          ((not (atom exp))
           (cond
+            ((eq 'importenv (car exp))
+             (display (importenv! (eval (cadr exp) (exportenv)))))
+            ((eq 'exportenv (car exp))
+             (display (exportenv!)))
             ((eq 'def (car exp))
              (display (<< (cadr exp) (eval (caddr exp) *env*))))
             (t (display (>> exp)))))
@@ -385,8 +389,8 @@ y            ; ==> b
 ;; Test 1
 'Test_1
 
-(importenv! plisp)
 (repl)
+(importenv plisp)
 (def reverse2
   '(lambda (x)
      ((label
@@ -398,10 +402,9 @@ y            ; ==> b
 (reverse2 '(1 2 3 4 5 6 7 8 9 10))
 (eval* '(reverse2 '(1 2 3 4 5 6 7 8 9 10)) *env*)
 (eval* 'reverse2 *env*)
-(exit)
-(importenv! plisp)
-(repl)
+(importenv plisp)
 (eval* 'reverse2 *env*)
+; On the specifications of UrLISP, a program terminate when an error is displayed.
 (repl)
 (eval* '(cddr '(a b c d e)) *env*)
 (exit)
@@ -542,8 +545,8 @@ y            ; ==> b
 ;; Test 2
 'Test_2
 
-(importenv! plisp2)
 (repl)
+(importenv plisp2)
 (def reverse_z
   '(lambda (l)
      (funcall
@@ -555,7 +558,7 @@ y            ; ==> b
                  (t (f (cdr l)
                        (cons (car l) acc)))))))
       l '())))
-(reverse_z '(1 2 3 4 5 6 7 8 9 10))
+(reverse_z '(1 2 3 4 5 6 7 8 9 10))  ; error
 (repl)
 (eval* '(reverse_z '(1 2 3 4 5 6 7 8 9 10)) *env*)
 (exit)
