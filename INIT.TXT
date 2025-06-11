@@ -1,5 +1,5 @@
 ;;;;; An Initial Program for UrLISP ;;;;;;
-;; Version 0.4.1
+;; Version 0.5.0β
 ;; (C) 2025 Tsugu
 ;;;;;
 
@@ -8,10 +8,10 @@
 ;  Dynamic Scope, Lisp-1
 
 ;; Supported Functions & Special Forms:
-;  quote('), atom, eq, car, cdr, cons, cond, eval, label, lambda
+;  quote('), atom, eq, car, cdr, cons, cond, eval, while, setq, label, lambda
 
 ;; Unique Functions:
-;  importenv, exportenv, def, cls, quit, error, read, display, prompt
+;  importenv, exportenv, def, until, cls, quit, error, read, display, prompt
 
 ; -------------------------------------
 ;; Usage
@@ -35,6 +35,20 @@ y            ; ==> b
 ; Truth, False
 (eq 'a 'a)  ; ==> t
 (eq 'a 'b)  ; ==> nil
+
+; 'while'
+; (while <condition> <body>)
+; Do <body> while <condition> is true.
+
+; 'until'
+; (until <condition> <body>)
+; Do <body> until <condition> becomes true.
+
+; 'setq'
+(setq a '200)  ; ==> "Not found: a"
+(def a '100)
+(setq a '200)
+a  ; ==> 200
 
 ; Gabage Collection
 (gc)
@@ -198,16 +212,16 @@ y            ; ==> b
   '(lambda (x)
      (cond (x '()) (t 't))))
 ;
-(def rev-append
-  '(lambda (x y)
-     (cond ((eq '() x) y)
-           (t (rev-append (cdr x) (cons (car x) y))))))
+(def last  ; (last '(1 2 3)) ==> 3, (last '(1 2 3 . 4)) ==> 4
+  '(lambda (x)
+     (while
+      (not (atom x))
+      (cond ((eq '() (cdr x)) (setq x (car x)))
+            ((atom (cdr x)) (setq x (cdr x)))
+            (t (setq x (cdr x)))))))
 ;
 (def begin
-  '(lambda x (car (rev-append x '()))))
-;
-(def append
-  '(lambda (x y) (rev-append (rev-append x '()) y)))
+  '(lambda x (last x)))
 
 ; The global environment list '*env*'
 ;
@@ -272,22 +286,23 @@ y            ; ==> b
        '\0)))
 ;
 (def repl-loop
-  '(lambda ()
+  '(lambda (flag)
      (begin
-       (repl-body (car top))
-       (repl))))
-;
-(def repl
-  '(lambda ()
-     (begin
-       (read-top)
-       (cond
-         ((not (atom (car top)))
+       (until
+        flag
+        (begin
+          (read-top)
           (cond
-            ((not (eq 'exit (car (car top))))
-             (repl-loop))
-            (t '\0)))
-         (t (repl-loop))))))
+            ((not (atom (car top)))
+             (cond
+               ((not (eq 'exit (car (car top))))
+                (repl-body (car top)))
+               (t (setq flag 't))))
+            (t (repl-body (car top))))))
+       '\0)))
+
+(def repl
+  '(lambda () (repl-loop '())))
 
 ; =====================================
 ;; Functions of Puseud Numbers (inefficient!)

@@ -81,6 +81,9 @@ void initCells()
   gc_addSystemSymbol(Eval, "eval");
   gc_addSystemSymbol(Apply, "apply");
   gc_addSystemSymbol(Error, "error");
+  gc_addSystemSymbol(While, "while");
+  gc_addSystemSymbol(Until, "until");
+  gc_addSystemSymbol(Setq, "setq");
   gc_addSystemSymbol(Gc, "gc");
   gc_addSystemSymbol(ImportEnv, "importenv");
   gc_addSystemSymbol(ExportEnv, "exportenv");
@@ -134,7 +137,7 @@ void greeting()
   printf("\n");
   printf("\t  A Minimal Pure LISP Interpreter  \n\n");
   printf("\t            U r L I S P            \n\n");
-  printf("\t           Version 0.4.0           \n");
+  printf("\t           Version 0.5.0β          \n");
   printf("\tThis software is released under the\n");
   printf("\t            MIT License.           \n\n");
   printf("\t                     (C) 2025 Tsugu\n\n");

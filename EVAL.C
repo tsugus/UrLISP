@@ -214,6 +214,42 @@ Index evlist(Index members, Index env)
   return rev_append(indx, Nil);
 }
 
+Index while_(Index cndt, Index body, Index env)
+{
+  Index result;
+
+  result = Nil;
+  while (eval(cndt, env) != Nil)
+  {
+    result = eval(body, env);
+    ec;
+  }
+  return result;
+}
+
+Index until(Index cndt, Index body, Index env)
+{
+  Index result;
+
+  do
+  {
+    result = eval(body, env);
+    ec;
+  } while (eval(cndt, env) == Nil);
+  return result;
+}
+
+Index setq(Index key, Index val, Index lst)
+{
+  if (!is(key, SYMBOL))
+    return error("A key is not an symbol.");
+  for (; lst != Nil; lst = cdr(lst))
+    if (key == car(car(lst)))
+      return cdr(rplacd(car(lst), val));
+  error_(Num1, key);
+  return Nil;
+}
+
 Index eval(Index exp, Index env)
 {
   Index result;
@@ -366,6 +402,15 @@ Index apply(Index func, Index args, Index env)
     case Error:
       check_2_args(args);
       return error_(car(args), car(cdr(args)));
+    case While:
+      check_2_args(args);
+      return while_(car(args), car(cdr(args)), env);
+    case Until:
+      check_2_args(args);
+      return until(car(args), car(cdr(args)), env);
+    case Setq:
+      check_2_args(args);
+      return setq(car(args), eval(car(cdr(args)), env), env);
     case Gc:
       mark_and_sweep();
       return Nil;
