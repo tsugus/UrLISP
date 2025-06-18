@@ -1,16 +1,15 @@
 ;;;;; An Initial Program for UrLISP ;;;;;;
-;; Version 0.4.1
+;; Version 0.4.2
 ;; (C) 2025 Tsugu
 ;;;;;
 
 ; -------------------------------------
 ;; System Categories:
 ;  Dynamic Scope, Lisp-1
+;  TRO (tail recursion optimization) not supported.
 
 ;; Supported Functions & Special Forms:
-;  quote('), atom, eq, car, cdr, cons, cond, eval, label, lambda
-
-;; Unique Functions:
+;  quote('), atom, eq, car, cdr, cons, cond, label, lambda, eval, apply,
 ;  importenv, exportenv, def, cls, quit, error, read, display, prompt
 
 ; -------------------------------------
@@ -73,7 +72,7 @@ y            ; ==> b
 ;; Meta-circular Evaluator
 
 ; A meta-circular pure LISP program 'plisp'
-;
+
 (def plisp
   '(
     (caar . (lambda (x) (car (car x))))
@@ -124,11 +123,11 @@ y            ; ==> b
     ; (error
     ;  . (lambda (err-code s-exp)
     ;      (Return a nil with outputing an error code and a S-expression.)))
-    (assoc
+    (assocv
      . (lambda (key lst)
          (cond ((null lst) (error '1 key))
                ((eq key (caar lst)) (cdar lst))
-               (t (assoc key (cdr lst))))))
+               (t (assocv key (cdr lst))))))
     (isSUBR
      . (lambda (x)
          (cond ((eq x 'atom) 't)
@@ -165,7 +164,7 @@ y            ; ==> b
               ((eq func 'cons) (cons (car args) (cadr args)))
               ((eq func 'cond) (evcond args env))
               ((eq func 'error) (error (car args) (cadr args)))
-              (t (eval* (cons (assoc func env) args) env))))
+              (t (eval* (cons (assocv func env) args) env))))
            ((eq (car func) 'label)
             (eval* (cons (caddr func) args)
                    (cons (cons (cadr func) (caddr func)) env)))
@@ -179,7 +178,7 @@ y            ; ==> b
          (cond
            ((eq exp 't) 't)
            ((eq exp '()) '())
-           ((atom exp) (assoc exp env))
+           ((atom exp) (assocv exp env))
            ((isSUBR (car exp))
             (apply* (car exp) (evlist (cdr exp) env) env))
            (t
@@ -462,11 +461,11 @@ y            ; ==> b
     ; (error
     ;  . (lambda (err-code s-exp)
     ;      (Return a nil with outputing an error code and a S-expression.)))
-    (assoc
+    (assocv
      . (lambda (key lst)
          (cond ((null lst) (error '1 key))
                ((eq key (caar lst)) (cdar lst))
-               (t (assoc key (cdr lst))))))
+               (t (assocv key (cdr lst))))))
     (isSUBR
      . (lambda (x)
          (cond ((eq x 'atom) 't)
@@ -509,7 +508,7 @@ y            ; ==> b
               ((eq func 'function) (list 'funarg (car args) env))
               ((eq func 'funarg) (cons func args))
               ((eq func 'error) (error (car args) (cadr args)))
-              (t (eval* (cons (assoc func env) args) env))))
+              (t (eval* (cons (assocv func env) args) env))))
            ((eq (car func) 'label)
             (eval* (cons (caddr func) args)
                    (cons (cons (cadr func) (caddr func)) env)))
@@ -524,7 +523,7 @@ y            ; ==> b
          (cond
            ((eq exp 't) 't)
            ((eq exp '()) '())
-           ((atom exp) (assoc exp env))
+           ((atom exp) (assocv exp env))
            ((or (isSUBR (car exp))
                 (cond ((not (or (atom (car exp)) (null (car exp))))
                        (or (eq (caar exp) 'funarg)
