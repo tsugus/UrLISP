@@ -7,9 +7,9 @@
 /*                      (C) 2025 Tsugu */
 /*                                     */
 
-#define CELLS_SIZE 0x8000   /* Total number of cells */
-#define STACK_SIZE 0x4000   /* Size of the stack for Gabage Collection */
-#define TEXTBUF_SIZE 100    /* Input text buffer */
+#define CELLS_SIZE 0x10000  /* Total number of cells */
+#define STACK_SIZE 0x5000   /* Size of the stack for Gabage Collection */
+#define TEXTBUF_SIZE 400    /* Input text buffer */
 #define SYMBOLTABLE_SIZE 64 /* Size of the hash table for symbols */
 #define PROMPT_LEN 11       /* The length of the prompt */
 #define tag(x) (tags[x])    /* Tag to store ID */
@@ -49,6 +49,9 @@ enum name
   Eval,
   Apply,
   Error,
+  While,
+  DoWhile,
+  Setq,
   Gc,
   ImportEnv,
   ExportEnv,
@@ -63,6 +66,10 @@ enum name
   Nullchar,
   Whitespace,
   Newline,
+  Reverse,
+  Append,
+  Assoclist,
+  Assocv,
   Num1,
   Num2,
   Last

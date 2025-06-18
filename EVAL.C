@@ -6,12 +6,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include "LISP.H"
-#define check_1_arg(x) \
-  if (!is(x, CELL))    \
-  return error("Not enough arguments")
-#define check_2_args(x)                  \
-  if (!is(x, CELL) || !is(cdr(x), CELL)) \
-  return error("Not enough arguments")
+#define check_1_arg(x)                    \
+  if (!is(x, CELL))                       \
+    return error("Not enough arguments"); \
+  ec
+#define check_2_args(x)                   \
+  if (!is(x, CELL) || !is(cdr(x), CELL))  \
+    return error("Not enough arguments"); \
+  ec
 
 void print_error(Index exp, char *msg)
 {
@@ -39,6 +41,7 @@ Index error_(Index code, Index exp)
   printS(exp);
   putchar('\n');
   err = print_no_more;
+  sp = 0;
   return Nil;
 }
 
@@ -137,7 +140,7 @@ Index assoclist(Index keys, Index values)
   return rev_append(indx, Nil);
 }
 
-Index assoc(Index key, Index lst)
+Index assocv(Index key, Index lst)
 {
   if (!is(key, SYMBOL))
     return error("A key is not an symbol.");
@@ -172,6 +175,10 @@ Index isSUBR(Index x)
   case Cons:
   case Rplaca:
   case Rplacd:
+  case Reverse:
+  case Append:
+  case Assoclist:
+  case Assocv:
   case Eval:
   case Apply:
   case Error:
@@ -214,32 +221,70 @@ Index evlist(Index members, Index env)
   return rev_append(indx, Nil);
 }
 
-Index eval(Index exp, Index env)
+Index while_(Index cndt, Index bodies, Index env)
 {
-  Index result;
+  Index Ss, result;
 
-  push(exp);
+  push(cndt);
+  ec;
+  push(bodies);
   ec;
   push(env);
   ec;
-  if (exp == T)
-    result = T;
-  else if (exp == Nil)
-    result = Nil;
-  else if (atom(exp) == T)
-    result = assoc(exp, env);
-  else if (isSUBR(car(exp)) == T)
-    result = apply(car(exp), evlist(cdr(exp), env), env);
-  else
-    result = apply(car(exp), cdr(exp), env);
-  if (err == on)
+  result = Nil;
+  while (eval(cndt, env) != Nil)
   {
-    print_error(exp, message);
-    return Nil;
+    for (Ss = bodies; Ss != Nil; Ss = cdr(Ss))
+    {
+      push(Ss);
+      ec;
+      result = eval(car(Ss), env);
+      ec;
+      pop();
+    }
   }
   pop();
   pop();
+  pop();
   return result;
+}
+
+Index dowhile(Index cndt, Index bodies, Index env)
+{
+  Index Ss, result;
+
+  push(cndt);
+  ec;
+  push(bodies);
+  ec;
+  push(env);
+  ec;
+  do
+  {
+    for (Ss = bodies; Ss != Nil; Ss = cdr(Ss))
+    {
+      push(Ss);
+      ec;
+      result = eval(car(Ss), env);
+      ec;
+      pop();
+    }
+  } while (eval(cndt, env) != Nil);
+  pop();
+  pop();
+  pop();
+  return result;
+}
+
+Index setq(Index key, Index val, Index lst)
+{
+  if (!is(key, SYMBOL))
+    return error("A key is not an symbol.");
+  for (; lst != Nil; lst = cdr(lst))
+    if (key == car(car(lst)))
+      return cdr(rplacd(car(lst), val));
+  error_(Num1, key);
+  return Nil;
 }
 
 Index num(Index arg)
@@ -308,6 +353,36 @@ Index promptt(Index atom)
   return T;
 }
 
+Index eval(Index exp, Index env)
+{
+  Index result;
+
+  push(exp);
+  ec;
+  push(env);
+  ec;
+  if (exp == T)
+    result = T;
+  else if (exp == Nil)
+    result = Nil;
+  else if (atom(exp) == T)
+    result = assocv(exp, env);
+  else if (isSUBR(car(exp)) == T)
+    result = apply(car(exp), evlist(cdr(exp), env), env);
+  else
+    result = apply(car(exp), cdr(exp), env);
+  if (err == on)
+  {
+    print_error(exp, message);
+    pop();
+    pop();
+    return Nil;
+  }
+  pop();
+  pop();
+  return result;
+}
+
 Index apply(Index func, Index args, Index env)
 {
   if (atom(func) == T && func != Nil)
@@ -348,36 +423,57 @@ Index apply(Index func, Index args, Index env)
     case Cons:
       check_2_args(args);
       return cons(car(args), car(cdr(args)));
+    case Cond:
+      check_1_arg(args);
+      return evcond(args, env);
     case Rplaca:
       check_2_args(args);
       return rplaca(car(args), car(cdr(args)));
     case Rplacd:
       check_2_args(args);
       return rplacd(car(args), car(cdr(args)));
-    case Cond:
+    case Setq:
+      check_2_args(args);
+      return setq(car(args), eval(car(cdr(args)), env), env);
+    case Reverse:
       check_1_arg(args);
-      return evcond(args, env);
+      return rev_append(car(args), Nil);
+    case Append:
+      check_2_args(args);
+      return rev_append(rev_append(car(args), Nil), car(cdr(args)));
+    case Assoclist:
+      check_2_args(args);
+      return assoclist(car(args), car(cdr(args)));
+    case Assocv:
+      check_2_args(args);
+      return assocv(car(args), (car(cdr(args))));
     case Eval:
       check_2_args(args);
       return eval(car(args), car(cdr(args)));
     case Apply:
       check_2_args(args);
       return apply(car(args), car(cdr(args)), env);
+    case ExportEnv:
+      return environment;
+    case While:
+      check_2_args(args);
+      return while_(car(args), (cdr(args)), env);
+    case DoWhile:
+      check_2_args(args);
+      return dowhile(car(args), cdr(args), env);
+      return T;
     case Error:
       check_2_args(args);
       return error_(car(args), car(cdr(args)));
     case Gc:
       mark_and_sweep();
       return Nil;
-    case ImportEnv:
-      check_1_arg(args);
-      environment = eval(car(args), env);
-      return T;
-    case ExportEnv:
-      return environment;
     case Def:
       check_2_args(args);
       return def(car(args), eval(car(cdr(args)), env));
+    case ImportEnv:
+      check_1_arg(args);
+      environment = eval(car(args), env);
     case Num:
       check_1_arg(args);
       return num(car(args));
@@ -397,7 +493,7 @@ Index apply(Index func, Index args, Index env)
       check_1_arg(args);
       return promptt(car(args));
     default:
-      return eval(cons(assoc(func, env), args), env);
+      return eval(cons(assocv(func, env), args), env);
     }
   }
   else if (car(func) == Label)

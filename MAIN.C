@@ -81,6 +81,9 @@ void initCells()
   gc_addSystemSymbol(Eval, "eval");
   gc_addSystemSymbol(Apply, "apply");
   gc_addSystemSymbol(Error, "error");
+  gc_addSystemSymbol(While, "while");
+  gc_addSystemSymbol(DoWhile, "do-while");
+  gc_addSystemSymbol(Setq, "setq");
   gc_addSystemSymbol(Gc, "gc");
   gc_addSystemSymbol(ImportEnv, "importenv");
   gc_addSystemSymbol(ExportEnv, "exportenv");
@@ -95,6 +98,10 @@ void initCells()
   gc_addSystemSymbol(Nullchar, "\\0");
   gc_addSystemSymbol(Whitespace, "\\s");
   gc_addSystemSymbol(Newline, "\\n");
+  gc_addSystemSymbol(Reverse, "reverse");
+  gc_addSystemSymbol(Append, "append");
+  gc_addSystemSymbol(Assoclist, "assoclist");
+  gc_addSystemSymbol(Assocv, "assocv");
   gc_addSystemSymbol(Num1, "1");
   gc_addSystemSymbol(Num2, "2");
 }
@@ -134,7 +141,7 @@ void greeting()
   printf("\n");
   printf("\t  A Minimal Pure LISP Interpreter  \n\n");
   printf("\t            U r L I S P            \n\n");
-  printf("\t           Version 0.4.0           \n");
+  printf("\t           Version 0.5.0           \n");
   printf("\tThis software is released under the\n");
   printf("\t            MIT License.           \n\n");
   printf("\t                     (C) 2025 Tsugu\n\n");
@@ -160,7 +167,7 @@ int main()
   ifp = fopen("INIT.TXT", "r"); /* LISP programs to load at startup */
   if (ifp == NULL)
   {
-    printf("\"init.txt\" is missing. Please prepare an empty init.txt file.\n");
+    printf("\"INIT.TXT\" is missing. Please prepare an empty INIT.TXT file.\n");
     return Nil;
   }
   err = off;
