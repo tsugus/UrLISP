@@ -730,28 +730,26 @@ a  ; ==> 200
 
 ;; TEST
 
-(def list1
-  '((lambda (x)
-      ((label
-        rec
-        (lambda (x y)
-          (cond ((eq '() x) y)
-                (t (rec (cdr x) (cons (car x) y))))))
-       x '())) '(1 2 3 4 5)))
+(eval_
+ '((lambda (x)
+     ((label
+       rev
+       (lambda (x y)
+         (cond ((eq '() x) y)
+               (t (rev (cdr x) (cons (car x) y))))))
+      x '())) '(1 2 3 4 5))
+ '())
 
-(eval_ list1 '())
-
-(def list2
-  '((label
-     subst
-     (lambda (x y z)
-       (cond ((atom z) (cond ((eq z y) x)
-                             ('t z)))
-             ('t (cons (subst x y (car z))
-                       (subst x y (cdr z)))))))
-    'm 'b '(a b (a b c) d)))
-
-(eval_ list2 '())
+(eval_
+ '((label
+    subst
+    (lambda (x y z)
+      (cond ((atom z) (cond ((eq z y) x)
+                            ('t z)))
+            ('t (cons (subst x y (car z))
+                      (subst x y (cdr z)))))))
+   'm 'b '(a b (a b c) d))
+ '())
 
 (def infloop
   '(lambda () (infloop2)))
