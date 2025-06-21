@@ -1,5 +1,5 @@
 ;;;;; An Initial Program for UrLISP ;;;;;;
-;; Version 0.5.0
+;; Version 0.5.1
 ;; (C) 2025 Tsugu
 ;;;;;
 
@@ -205,7 +205,7 @@ a  ; ==> 200
      (do-while
       (not (atom exp))
       (cond
-        ((eq 'label (caar exp))
+        ((cond ((atom (car exp)) '()) (t (eq 'label (caar exp))))
          (do-while
           ()
           (setq lst (cons (cons (cadar exp) terms) lst))
@@ -217,7 +217,7 @@ a  ; ==> 200
           (setq lst lst)
           (setq terms (cons (car exp) terms))
           (setq exp (cdr exp)))))
-      lst))))
+      lst)))
 
 ; program counter "(label . function)"
 (def PC '(()))
