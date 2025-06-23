@@ -22,6 +22,7 @@ FILE *ifp;
 int sp;
 Index environment;
 int no_input_after_GC;
+int display_GC;
 char prompt[PROMPT_LEN]; /* The prompt */
 
 /* Give a name to the cell with index n, make it a symbol, and register it in the table. */
@@ -98,10 +99,7 @@ void initCells()
   gc_addSystemSymbol(Nullchar, "\\0");
   gc_addSystemSymbol(Whitespace, "\\s");
   gc_addSystemSymbol(Newline, "\\n");
-  gc_addSystemSymbol(Reverse, "reverse");
-  gc_addSystemSymbol(Append, "append");
-  gc_addSystemSymbol(Assoclist, "assoclist");
-  gc_addSystemSymbol(Assocv, "assocv");
+  gc_addSystemSymbol(Verbose, "verbos");
   gc_addSystemSymbol(Num1, "1");
   gc_addSystemSymbol(Num2, "2");
 }
@@ -141,7 +139,7 @@ void greeting()
   printf("\n");
   printf("\t  A Minimal Pure LISP Interpreter  \n\n");
   printf("\t            U r L I S P            \n\n");
-  printf("\t           Version 0.5.0           \n");
+  printf("\t           Version 0.6.0           \n");
   printf("\tThis software is released under the\n");
   printf("\t            MIT License.           \n\n");
   printf("\t                     (C) 2025 Tsugu\n\n");
@@ -170,6 +168,7 @@ int main()
     printf("\"INIT.TXT\" is missing. Please prepare an empty INIT.TXT file.\n");
     return Nil;
   }
+  display_GC = 0; /* Don't display gabage collections */
   err = off;
   top_loop();
   fclose(ifp);

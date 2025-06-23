@@ -151,19 +151,6 @@ Index assocv(Index key, Index lst)
   return Nil;
 }
 
-Index def(Index var, Index val)
-{
-  Index env;
-
-  push(var);
-  ec;
-  env = cons(cons(var, val), environment);
-  if (env != Nil) /* A workaround for unquoted lambda expressions clearing the environment list. */
-    environment = env;
-  pop();
-  return var;
-}
-
 Index isSUBR(Index x)
 {
   switch (x)
@@ -175,10 +162,6 @@ Index isSUBR(Index x)
   case Cons:
   case Rplaca:
   case Rplacd:
-  case Reverse:
-  case Append:
-  case Assoclist:
-  case Assocv:
   case Eval:
   case Apply:
   case Error:
@@ -186,6 +169,7 @@ Index isSUBR(Index x)
   case Read:
   case Display:
   case Prompt:
+  case Verbose:
     return T;
   default:
     return Nil;
@@ -219,6 +203,30 @@ Index evlist(Index members, Index env)
     pop();
   }
   return rev_append(indx, Nil);
+}
+
+Index def(Index var, Index val)
+{
+  Index env;
+
+  push(var);
+  ec;
+  env = cons(cons(var, val), environment);
+  if (env != Nil) /* A workaround for unquoted lambda expressions clearing the environment list. */
+    environment = env;
+  pop();
+  return var;
+}
+
+Index setq(Index key, Index val, Index lst)
+{
+  if (!is(key, SYMBOL))
+    return error("A key is not an symbol.");
+  for (; lst != Nil; lst = cdr(lst))
+    if (key == car(car(lst)))
+      return cdr(rplacd(car(lst), val));
+  error_(Num1, key);
+  return Nil;
 }
 
 Index while_(Index cndt, Index bodies, Index env)
@@ -274,17 +282,6 @@ Index dowhile(Index cndt, Index bodies, Index env)
   pop();
   pop();
   return result;
-}
-
-Index setq(Index key, Index val, Index lst)
-{
-  if (!is(key, SYMBOL))
-    return error("A key is not an symbol.");
-  for (; lst != Nil; lst = cdr(lst))
-    if (key == car(car(lst)))
-      return cdr(rplacd(car(lst), val));
-  error_(Num1, key);
-  return Nil;
 }
 
 Index num(Index arg)
@@ -432,54 +429,41 @@ Index apply(Index func, Index args, Index env)
     case Rplacd:
       check_2_args(args);
       return rplacd(car(args), car(cdr(args)));
-    case Setq:
-      check_2_args(args);
-      return setq(car(args), eval(car(cdr(args)), env), env);
-    case Reverse:
-      check_1_arg(args);
-      return rev_append(car(args), Nil);
-    case Append:
-      check_2_args(args);
-      return rev_append(rev_append(car(args), Nil), car(cdr(args)));
-    case Assoclist:
-      check_2_args(args);
-      return assoclist(car(args), car(cdr(args)));
-    case Assocv:
-      check_2_args(args);
-      return assocv(car(args), (car(cdr(args))));
     case Eval:
       check_2_args(args);
       return eval(car(args), car(cdr(args)));
     case Apply:
       check_2_args(args);
       return apply(car(args), car(cdr(args)), env);
-    case ExportEnv:
-      return environment;
+    case Def:
+      check_2_args(args);
+      return def(car(args), eval(car(cdr(args)), env));
+    case Setq:
+      check_2_args(args);
+      return setq(car(args), eval(car(cdr(args)), env), env);
     case While:
       check_2_args(args);
       return while_(car(args), (cdr(args)), env);
     case DoWhile:
       check_2_args(args);
       return dowhile(car(args), cdr(args), env);
-      return T;
     case Error:
       check_2_args(args);
       return error_(car(args), car(cdr(args)));
-    case Gc:
-      mark_and_sweep();
-      return Nil;
-    case Def:
-      check_2_args(args);
-      return def(car(args), eval(car(cdr(args)), env));
-    case ImportEnv:
-      check_1_arg(args);
-      environment = eval(car(args), env);
     case Num:
       check_1_arg(args);
       return num(car(args));
     case Len:
       check_1_arg(args);
       return len(car(args));
+    case Gc:
+      mark_and_sweep();
+      return Nil;
+    case ImportEnv:
+      check_1_arg(args);
+      environment = eval(car(args), env);
+    case ExportEnv:
+      return environment;
     case Quit:
       return quit();
     case Cls:
@@ -492,6 +476,18 @@ Index apply(Index func, Index args, Index env)
     case Prompt:
       check_1_arg(args);
       return promptt(car(args));
+    case Verbose:
+      check_1_arg(args);
+      if (car(args) == Nil)
+      {
+        display_GC = 0;
+        return Nil;
+      }
+      else
+      {
+        display_GC = 1;
+        return T;
+      }
     default:
       return eval(cons(assocv(func, env), args), env);
     }

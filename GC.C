@@ -97,7 +97,8 @@ void mark_and_sweep()
   Index indx;
   int i;
 
-  putchar('.');   /* A sign that GC has started */
+  if (display_GC)
+    printf(".");  /* A sign that GC has started */
   fflush(stdout); /* To display sequentially */
   no_input_after_GC = 1;
   /* Mark with a minus sign. */

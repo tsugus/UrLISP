@@ -35,41 +35,38 @@ enum name
 {
   Nil,
   T,
-  Lambda,
-  Label,
   Quote,
   Atom,
   Eq,
   Car,
   Cdr,
   Cons,
+  Cond,
+  Lambda,
+  Label,
   Rplaca,
   Rplacd,
-  Cond,
   Eval,
   Apply,
-  Error,
+  Def,
+  Setq,
   While,
   DoWhile,
-  Setq,
+  Error,
+  Num,
+  Len,
   Gc,
   ImportEnv,
   ExportEnv,
-  Def,
-  Num,
-  Len,
   Quit,
   Cls,
   Read,
   Display,
   Prompt,
+  Verbose,
   Nullchar,
   Whitespace,
   Newline,
-  Reverse,
-  Append,
-  Assoclist,
-  Assocv,
   Num1,
   Num2,
   Last
@@ -113,9 +110,10 @@ extern Index symbol_table[SYMBOLTABLE_SIZE];
 extern int err;
 extern char *message;
 extern FILE *ifp;
-extern int sp;            /* The stack pointer for GC */
-extern Index environment; /* The Environment list */
-extern int no_input_after_GC;
+extern int sp;                  /* The stack pointer for GC */
+extern Index environment;       /* The Environment list */
+extern int no_input_after_GC;   /* flag */
+extern int display_GC;          /* flag */
 extern char prompt[PROMPT_LEN]; /* The prompt */
 #endif
 

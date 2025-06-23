@@ -1,5 +1,5 @@
 ;;;;; An Initial Program for UrLISP ;;;;;;
-;; Version 0.5.1
+;; Version 0.6.0
 ;; (C) 2025 Tsugu
 ;;;;;
 
@@ -11,9 +11,10 @@
 
 ;; Supported Functions & Special Forms:
 ;  quote('), atom, eq, car, cdr, cons, cond, label, lambda,
-;  def, setq, eval, while, do-while, num, len,
-;  importenv, exportenv, def, cls, quit, error, read, display, prompt
-;  reverse, append, assoclist, assocv
+;  rplaca, rplacd, eval, apply,
+;  def, setq, while, do-while, error,
+;  num(#), len(#=), gc, importenv, exportenv,
+;  quit, cls, read, display, prompt verbos
 
 ; -------------------------------------
 ;; Usage
@@ -34,6 +35,12 @@ x                       ; ==> a
 x            ; ==> a
 y            ; ==> b
 
+; 'setq'
+(setq a '200)  ; ==> "Not found: a"
+(def a '100)
+(setq a '200)
+a  ; ==> 200
+
 ; Truth, False
 (eq 'a 'a)  ; ==> t
 (eq 'a 'b)  ; ==> nil
@@ -44,7 +51,7 @@ y            ; ==> b
 ; 'do-while'
 ; (do-while <condition> s1 s2 s3 ... sn)
 
-; A examples. Display "*****".
+; An example. Display "*****".
 ((lambda (lst)
    (do-while
     ()
@@ -55,14 +62,14 @@ y            ; ==> b
     (display '\0)))  ; a null character
  '(t t t t t))
 
-; 'setq'
-(setq a '200)  ; ==> "Not found: a"
-(def a '100)
-(setq a '200)
-a  ; ==> 200
-
 ; Gabage Collection
 (gc)
+
+; Show garbage collection initiation.
+(verbos '())
+(gc)  ; ==>
+(verbos 't)
+(gc)  ; ==> .
 
 ; Initializing of the environment list
 (importenv '())
@@ -71,7 +78,7 @@ a  ; ==> 200
 ; (cls)
 
 ; Exit UrLISP
-; (exit)
+; (quit)
 
 ; Display Errors
 (error '1 'exp)  ; ==> "Not found: exp"
@@ -99,23 +106,11 @@ a  ; ==> 200
 #6       ; ==> (t t t t t t)
 
 ; len
-(len '(a a a b b))  ;  ==> 5
-#= '(a a a b b)     ; ==> 5
-
-; reverse
-(reverse '(1 2 3 4 5))  ; ==> (5 4 3 2 1)
-
-; append
-(append '(a b c) '(d e))  ; ==> (a b c d e)
-
-; assoclist
-(assoclist '(x y . z) '(1 2 3 4))  ; ==> ((x . 1) (y . 2) (z 3 4)))
-
-; assoc
-(assocv 'y '((x . 1) (y . 2) (z . (3 . 4))))  ; ==> 2
+(len '(a a a b b))  ; ==> 5
+#='(a a a b b)      ; ==> 5
 
 ; =====================================
-; Basic Functions
+;; Basic Functions
 
 (def caar '(lambda (x) (car (car x))))
 (def cadr '(lambda (x) (car (cdr x))))
@@ -131,18 +126,53 @@ a  ; ==> 200
 (def cdddr '(lambda (x) (cdr (cddr x))))
 (def caddar '(lambda (x) (car (cddar x))))
 
-(def list '(lambda x x))
+(def list
+  '(lambda x x))
 
-(def null '(lambda (x) (eq x '())))
+(def null
+  '(lambda (x) (eq x '())))
 
-(def not '(lambda (x)
-            (cond (x '()) (t 't))))
+(def not
+  '(lambda (x)
+     (cond (x '()) (t 't))))
 
-(def and '(lambda (x y)
-            (cond (x y) (t '()))))
+(def and
+  '(lambda (x y)
+     (cond (x y) (t '()))))
 
-(def or '(lambda (x y)
-           (cond (x 't) (t y))))
+(def or
+  '(lambda (x y)
+     (cond (x 't) (t y))))
+
+(def imply
+  '(lambda (x y)
+     (cond (x y) (t 't))))
+
+(def rev-append
+  ' (lambda (x y)
+      (cond ((null x) y)
+            (t (rev-append (cdr x) (cons (car x) y))))))
+
+(def reverse
+  '(lambda (x) (rev-append x '())))
+
+(def append
+  '(lambda (x y) (rev-append (rev-append x '()) y)))
+
+(def assoclist
+  '(lambda (keys values)
+     (cond ((or (null keys) (null values)) '())
+           ((and (not (atom keys)) (not (atom values)))
+            (cons (cons (car keys) (car values))
+                  (assoclist (cdr keys) (cdr values))))
+           ((not (null keys))
+            (list (cons keys values))))))
+
+(def assocv
+  '(lambda (key lst)
+     (cond ((null lst) (error '1 key))
+           ((eq key (caar lst)) (cdar lst))
+           (t (assocv key (cdr lst))))))
 
 (def isSUBR
   '(lambda (x)
@@ -151,16 +181,102 @@ a  ; ==> 200
            ((eq x 'car) 't)
            ((eq x 'cdr) 't)
            ((eq x 'cons) 't)
+           ((eq x 'len) 't)
            ((eq x 'error) 't)
            (t '()))))
 
 ; =====================================
-;;; Stack and GOTO System
-;;   (GOTO is freedum!
-;;   Don't be afraid of spaghetti programs,
-;;   because GOTO [or jump] makes Tail Recursion Optimization easy.)
+;; Inner interpretor
+
+; The global environment list '*env*'
+(def *env* (cons (cons '*env* '()) '()))
+
+; Add (x . y) to *env*.
+(def <<
+  '(lambda (x y)
+     (do-while
+      ()
+      (rplacd *env* (cons (cons x y) (cdr *env*)))
+      (rplacd (car *env*) (cdr *env*))
+      x)))
+
+; Eval x on the environment list.
+(def >> '(lambda (evl x) (evl x *env*)))
+
+; Import an environment.
+(def importenv!
+  '(lambda (env)
+     (do-while
+      ()
+      (rplacd *env* env)
+      (rplacd (car *env*) env)
+      't)))
+
+; Export the environment.
+(def exportenv!
+  '(lambda ()
+     *env*))
+
+; The holder of the top level S-expression
+(def top '(()))
+
+; Inner REPL
+(def repl-body
+  '(lambda (evl exp)
+     (do-while
+      ()
+      (cond
+        ((not (atom exp))
+         (cond
+           ((eq 'importenv (car exp))
+            (display (importenv! (eval (cadr exp) (exportenv)))))
+           ((eq 'exportenv (car exp))
+            (display (exportenv!)))
+           ((eq 'def (car exp))
+            (display (<< (cadr exp) (eval (caddr exp) *env*))))
+           (t (display (>> evl exp)))))
+        (t (display (>> evl exp))))
+      (display '\n))))
 ;
-; An Example of "Flowchart List"
+(def read-top
+  '(lambda ()
+     (do-while
+      ()
+      (prompt '>)
+      (rplaca top (read))
+      (prompt '%)
+      '\0)))
+;
+(def repl
+  '(lambda (evl)
+     ((lambda (flag)
+        (do-while
+         (not (eq flag 'ok))
+         (read-top)
+         (cond
+           ((not (atom (car top)))
+            (cond
+              ((not (eq 'exit (car (car top))))
+               (repl-body evl (car top)))
+              (t (setq flag 'ok))))
+           (t (repl-body evl (car top))))))
+      't)))
+
+; ===============================================
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                               ;
+;                                               ;
+;      S t a c k  &  G O T O  S y s t e m       ;
+;                                               ;
+;                                               ;
+;                GOTO is freedom!               ;
+;     Don't be afraid of spaghetti programs,    ;
+;         because GOTO (or jump) makes          ;
+;       Tail Recursion Optimization easy.       ;
+;                                               ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;; An Example of "Flowchart List"
 ;
 ; ((label START)
 ;  <S-exp>
@@ -183,13 +299,13 @@ a  ; ==> 200
 ;  The "flow" cannot jump over labels.
 ;  The first label must be "START".
 ;  "Flowchart list" can be converted to "program list".
-;  If you give a name to a "program list" with "define",
+;  If you give a name to a "program list" with "def",
 ; you can call a subroutine with "call".
 ;  "call" must specify a return label.
 ;  "goto" is only valid within the same subroutine;
 ; to go to another subroutine, use "jump."
 ;
-; An Example of "Program"
+;; An Example of "Program"
 ;
 ; ((START <S-exp> ... <S-exp> (branch 'Name1 'Name2))
 ;  (Name1 <S-exp> ... <S-exp> (return))
@@ -372,8 +488,8 @@ a  ; ==> 200
       (dpush exp)
       (do 'eval__))))
 
-; =====================================
-;; Pure LISP Interpreter for Stack and GOTO System
+; -----------------------------------------------
+;; Pure LISP Interpreter for Stack & GOTO System
 
 (def eval__
   (prog<-flow
@@ -657,8 +773,7 @@ a  ; ==> 200
        (cons (dpop) (dpop))))  ; [(error '2 (cons func args)) env]
      (swap)                    ; [env (error '2 (cons func args))]
      (dpop)                    ; [(error '2 (cons func args))]
-     (return)
-     )))
+     (return))))
 
 
 (def evcond__
@@ -726,35 +841,124 @@ a  ; ==> 200
       (cons (dpop) (dpop)))    ; [(cons (eval_ (car members) env) (evlist (cdr members) env))]
      (return))))
 
-; =====================================
+; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; ===============================================
 
+(def calc
+  '(
+    (+1
+     . (lambda (x) (cons 't x)))
+    (-1
+     . (lambda (x)
+         (cond ((eq #0 x) '())
+               (t (cdr x)))))
+    (+
+     . (lambda (x y)
+         (cond ((eq #0 y) x)
+               (t (+ (+1 x) (-1 y))))))
+    (*
+     . (lambda (x y)
+         ((label *rec
+                 (lambda (x y acc)
+                   (cond ((eq #0 y) acc)
+                         (t (*rec x (-1 y) (+ acc x))))))
+          x y '())))
+    (-
+     . (lambda (x y)
+         (cond ((eq #0 y) x)
+               (t (- (-1 x) (-1 y))))))
+    (|-|
+     . (lambda (x y)
+         (+ (- x y) (- y x))))
+    (=
+     . (lambda (x y)
+         (eq #0 (|-| x y))))
+    (<
+     . (lambda (x y)
+         (cond ((- y x) 't))))
+    (>
+     . (lambda (x y)
+         (cond ((- x y) 't))))
+    (/
+     . (lambda (x y)
+         ((label /rec
+                 (lambda (x y acc)
+                   (cond ((< x y) acc)
+                         (t (/rec (- x y) y (+1 acc))))))
+          x y '())))
+    (%
+     . (lambda (x y)
+         (cond ((< x y) x)
+               ((= x y) #0)
+               (t (% (- x y) y)))))
+    (fibo
+     . (lambda (n)
+         ((label fibo-rec
+                 (lambda (n pre sum)
+                   (cond
+                     ((eq #0 n) sum)
+                     (t (fibo-rec (-1 n) sum (+ pre sum))))))
+          n #1 #0)))
+    ))
+
+; =====================================
 ;; TEST
 
-(eval_
- '((lambda (x)
-     ((label
-       rev
-       (lambda (x y)
-         (cond ((eq '() x) y)
-               (t (rev (cdr x) (cons (car x) y))))))
-      x '())) '(1 2 3 4 5))
- '())
+; - - - - - - - - - - - - - - - - - - -
+'TEST_1
 
-(eval_
- '((label
-    subst
-    (lambda (x y z)
-      (cond ((atom z) (cond ((eq z y) x)
-                            ('t z)))
-            ('t (cons (subst x y (car z))
-                      (subst x y (cdr z)))))))
-   'm 'b '(a b (a b c) d))
- '())
+(repl 'eval)
+(importenv calc)
+#=(fibo #0)
+#=(fibo #1)
+#=(fibo #2)
+#=(fibo #3)
+#=(fibo #4)
+#=(fibo #5)
+#=(fibo #6)
+#=(fibo #7)
+#=(fibo #8)
+(exit)
 
+; - - - - - - - - - - - - - - - - - - -
+' TEST_2
+
+(repl 'eval_)
+(importenv '())
+
+((lambda (x)
+   ((label
+     rev
+     (lambda (x y)
+       (cond ((eq '() x) y)
+             (t (rev (cdr x) (cons (car x) y))))))
+    x '()))
+ '(1 2 3 4 5))
+
+((label
+  subst
+  (lambda (x y z)
+    (cond ((atom z) (cond ((eq z y) x)
+                          ('t z)))
+          ('t (cons (subst x y (car z))
+                    (subst x y (cdr z)))))))
+ 'm 'b '(a b (a b c) d))
+
+(exit)
+
+; - - - - - - - - - - - - - - - - - - -
+'TEST_3
+
+(repl 'eval_)
+(importenv '())
 (def infloop
   '(lambda () (infloop2)))
-
 (def infloop2
   '(lambda () (infloop)))
+(exit)
+; (repl 'eval) (infloop)
+;   --> "The software stack overflowed."
+; (repl 'eval_) (infloop)
+;   -->  TRO achieved! Please press Ctrl+C.
 
-; (eval_ '(infloop) (exportenv))  -->  Achive TRO!
+; -------------------------------------
