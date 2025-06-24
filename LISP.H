@@ -112,7 +112,6 @@ extern char *message;
 extern FILE *ifp;
 extern int sp;                  /* The stack pointer for GC */
 extern Index environment;       /* The Environment list */
-extern int no_input_after_GC;   /* flag */
 extern int display_GC;          /* flag */
 extern char prompt[PROMPT_LEN]; /* The prompt */
 #endif

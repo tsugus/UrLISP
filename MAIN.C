@@ -21,7 +21,6 @@ char *message;
 FILE *ifp;
 int sp;
 Index environment;
-int no_input_after_GC;
 int display_GC;
 char prompt[PROMPT_LEN]; /* The prompt */
 
@@ -112,7 +111,6 @@ void top_loop()
   {
     err = off;
     toplevel = gc_readS(1);
-    no_input_after_GC = 0;
     if (err != off)
     {
       char *chp;
@@ -126,8 +124,6 @@ void top_loop()
     toplevel = eval(toplevel, environment);
     if (err == off)
     {
-      if (no_input_after_GC)
-        putchar('\n');
       printS(toplevel);
       putchar('\n');
     }
@@ -139,7 +135,7 @@ void greeting()
   printf("\n");
   printf("\t  A Minimal Pure LISP Interpreter  \n\n");
   printf("\t            U r L I S P            \n\n");
-  printf("\t           Version 0.6.0           \n");
+  printf("\t           Version 0.6.1           \n");
   printf("\tThis software is released under the\n");
   printf("\t            MIT License.           \n\n");
   printf("\t                     (C) 2025 Tsugu\n\n");

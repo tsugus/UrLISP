@@ -100,7 +100,6 @@ void mark_and_sweep()
   if (display_GC)
     printf(".");  /* A sign that GC has started */
   fflush(stdout); /* To display sequentially */
-  no_input_after_GC = 1;
   /* Mark with a minus sign. */
   for (indx = 0; indx < CELLS_SIZE; indx++)
     tag(indx) = -abs(tag(indx));
