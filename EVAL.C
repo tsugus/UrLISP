@@ -166,6 +166,7 @@ Index isSUBR(Index x)
   case Apply:
   case Error:
   case Len:
+  case ImportEnv:
   case Read:
   case Display:
   case Prompt:
@@ -371,9 +372,7 @@ Index eval(Index exp, Index env)
   if (err == on)
   {
     print_error(exp, message);
-    pop();
-    pop();
-    return Nil;
+    result = Nil;
   }
   pop();
   pop();
@@ -461,7 +460,7 @@ Index apply(Index func, Index args, Index env)
       return Nil;
     case ImportEnv:
       check_1_arg(args);
-      environment = eval(car(args), env);
+      environment = car(args);
       return T;
     case ExportEnv:
       return environment;
