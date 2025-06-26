@@ -462,6 +462,7 @@ Index apply(Index func, Index args, Index env)
     case ImportEnv:
       check_1_arg(args);
       environment = eval(car(args), env);
+      return T;
     case ExportEnv:
       return environment;
     case Quit:
