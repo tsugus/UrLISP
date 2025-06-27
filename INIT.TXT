@@ -1,5 +1,5 @@
 ;;;;; An Initial Program for UrLISP ;;;;;;
-;; Version 0.6.0
+;; Version 0.6.1
 ;; (C) 2025 Tsugu
 ;;;;;
 
@@ -186,7 +186,7 @@ a  ; ==> 200
            (t '()))))
 
 ; =====================================
-;; Inner interpretor
+;; Virtual REPL
 
 ; The global environment list '*env*'
 (def *env* (cons (cons '*env* '()) '()))
@@ -200,7 +200,7 @@ a  ; ==> 200
       (rplacd (car *env*) (cdr *env*))
       x)))
 
-; Eval x on the environment list.
+; Eval x on the environment "*env*".
 (def >> '(lambda (evl x) (evl x *env*)))
 
 ; Import an environment.
@@ -212,15 +212,24 @@ a  ; ==> 200
       (rplacd (car *env*) env)
       't)))
 
-; Export the environment.
+; Export the environment "*env*".
 (def exportenv!
   '(lambda ()
      *env*))
 
+; Reset the environment "*env*".
+(def resetenv!
+  '(lambda ()
+     (do-while
+      ()
+      (setq *env* (cons (cons '*env* '()) '()))
+      't)))
+
 ; The holder of the top level S-expression
 (def top '(()))
 
-; Inner REPL
+; Virtual REPL
+;
 (def repl-body
   '(lambda (evl exp)
      (do-while
@@ -232,6 +241,8 @@ a  ; ==> 200
             (display (importenv! (eval (cadr exp) (exportenv)))))
            ((eq 'exportenv (car exp))
             (display (exportenv!)))
+           ((eq 'resetenv (car exp))
+            (display (resetenv!)))
            ((eq 'def (car exp))
             (display (<< (cadr exp) (eval (caddr exp) *env*))))
            (t (display (>> evl exp)))))
@@ -924,7 +935,7 @@ a  ; ==> 200
 ' TEST_2
 
 (repl 'eval_)
-(importenv '())
+(resetenv)
 
 ((lambda (x)
    ((label
@@ -950,7 +961,7 @@ a  ; ==> 200
 'TEST_3
 
 (repl 'eval_)
-(importenv '())
+(resetenv)
 (def infloop
   '(lambda () (infloop2)))
 (def infloop2
