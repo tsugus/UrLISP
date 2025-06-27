@@ -1,5 +1,5 @@
 ;;;;; An Initial Program for UrLISP ;;;;;;
-;; Version 0.6.1
+;; Version 0.6.2
 ;; (C) 2025 Tsugu
 ;;;;;
 
@@ -189,7 +189,7 @@ a  ; ==> 200
 ;; Virtual REPL
 
 ; The global environment list '*env*'
-(def *env* (cons (cons '*env* '()) '()))
+(def *env* '((*env*)))
 
 ; Add (x . y) to *env*.
 (def <<
@@ -222,7 +222,9 @@ a  ; ==> 200
   '(lambda ()
      (do-while
       ()
-      (setq *env* (cons (cons '*env* '()) '()))
+      (setq
+       *env*
+       (cons (cons '*env* '()) '()))  ; '((*env*)) won't work.
       't)))
 
 ; The holder of the top level S-expression
