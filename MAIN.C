@@ -67,14 +67,14 @@ void initCells()
 
   /* Registering system symbols */
   gc_addSystemSymbol(T, "t");
-  gc_addSystemSymbol(Lambda, "lambda");
-  gc_addSystemSymbol(Label, "label");
   gc_addSystemSymbol(Quote, "quote");
   gc_addSystemSymbol(Atom, "atom");
   gc_addSystemSymbol(Eq, "eq");
   gc_addSystemSymbol(Car, "car");
   gc_addSystemSymbol(Cdr, "cdr");
   gc_addSystemSymbol(Cons, "cons");
+  gc_addSystemSymbol(Label, "label");
+  gc_addSystemSymbol(Lambda, "lambda");
   gc_addSystemSymbol(Rplaca, "rplaca");
   gc_addSystemSymbol(Rplacd, "rplacd");
   gc_addSystemSymbol(Cond, "cond");
@@ -135,7 +135,7 @@ void greeting()
   printf("\n");
   printf("\t  A Minimal Pure LISP Interpreter  \n\n");
   printf("\t            U r L I S P            \n\n");
-  printf("\t           Version 0.6.3           \n");
+  printf("\t           Version 0.6.4           \n");
   printf("\tThis software is released under the\n");
   printf("\t            MIT License.           \n\n");
   printf("\t                     (C) 2025 Tsugu\n\n");
