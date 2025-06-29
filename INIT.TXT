@@ -1,5 +1,5 @@
 ;;;;; An Initial Program for UrLISP ;;;;;;
-;; Version 0.6.2
+;; Version 0.6.3
 ;; (C) 2025 Tsugu
 ;;;;;
 
@@ -201,7 +201,7 @@ a  ; ==> 200
       x)))
 
 ; Eval x on the environment "*env*".
-(def >> '(lambda (evl x) (evl x *env*)))
+(def >> '(lambda (an_eval x) (an_eval x *env*)))
 
 ; Import an environment.
 (def importenv!
@@ -233,7 +233,7 @@ a  ; ==> 200
 ; Virtual REPL
 ;
 (def repl-body
-  '(lambda (evl exp)
+  '(lambda (an_eval exp)
      (do-while
       ()
       (cond
@@ -247,8 +247,8 @@ a  ; ==> 200
             (display (resetenv!)))
            ((eq 'def (car exp))
             (display (<< (cadr exp) (eval (caddr exp) *env*))))
-           (t (display (>> evl exp)))))
-        (t (display (>> evl exp))))
+           (t (display (>> an_eval exp)))))
+        (t (display (>> an_eval exp))))
       (display '\n))))
 ;
 (def read-top
@@ -261,7 +261,7 @@ a  ; ==> 200
       '\0)))
 ;
 (def repl
-  '(lambda (evl)
+  '(lambda (an_eval)
      ((lambda (flag)
         (do-while
          (not (eq flag 'ok))
@@ -270,9 +270,9 @@ a  ; ==> 200
            ((not (atom (car top)))
             (cond
               ((not (eq 'exit (car (car top))))
-               (repl-body evl (car top)))
+               (repl-body an_eval (car top)))
               (t (setq flag 'ok))))
-           (t (repl-body evl (car top))))))
+           (t (repl-body an_eval (car top))))))
       't)))
 
 ; ===============================================
