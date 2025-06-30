@@ -365,7 +365,9 @@ Index eval(Index exp, Index env)
     result = Nil;
   else if (atom(exp) == T)
     result = assocv(exp, env);
-  else if (isSUBR(car(exp)) == T)
+  else if (isSUBR(car(exp)) == T ||
+           (!(atom(car(exp)) == T || car(exp) == Nil)) &&
+               car(car(exp)) == Lambda)
     result = apply(car(exp), evlist(cdr(exp), env), env);
   else
     result = apply(car(exp), cdr(exp), env);
@@ -503,8 +505,7 @@ Index apply(Index func, Index args, Index env)
   {
     check_1_arg(cdr(func));
     return eval(car(cdr(cdr(func))),
-                append(assoclist(car(cdr(func)),
-                                 evlist(args, env)),
+                append(assoclist(car(cdr(func)), args),
                        env));
   }
   else
