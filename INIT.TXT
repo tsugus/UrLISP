@@ -1,5 +1,5 @@
 ;;;;; An Initial Program for UrLISP ;;;;;;
-;; Version 0.6.3
+;; Version 0.6.4
 ;; (C) 2025 Tsugu
 ;;;;;
 
@@ -568,13 +568,12 @@ a  ; ==> 200
   (prog<-flow
    '((label START)    ; dstack = [func args env]
      (dup)                     ; [func func args env]
-     (dup)                     ; [func func func args env]
      (dpush
-      ((lambda (x y)           ; Support a special form "and".
+      ((lambda (func)          ; Support a special form "and".
          (and
-          (atom x)
-          (not (null y))))
-       (dpop) (dpop)))         ; [(and (atom func) (not (null func))) func args env]
+          (atom func)
+          (not (null func))))
+       (dpop)))                ; [(and (atom func) (not (null func))) func args env]
      (branch 'IS_QUOTE?
              'IS_LABEL?)       ; [func args env]
 
