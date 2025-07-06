@@ -9,7 +9,7 @@ UrLISP is an interpreter of so-called "pure LISP".
 It supports "super brackets" '[', ']' to group and close brackets together.
 
 Please refer to "init.txt" for usage.
-By the way, "INIT.TXT" is loaded as a asmple program file at startup.
+By the way, "INIT.TXT" is loaded as a sample program file at startup.
 
 ## How to compile
 
