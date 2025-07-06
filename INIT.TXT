@@ -1,5 +1,5 @@
 ;;;;; An Initial Program for UrLISP ;;;;;;
-;; Version 0.6.5
+;; Version 0.6.6
 ;; (C) 2025 Tsugu
 ;;;;;
 
@@ -29,7 +29,8 @@
 (exportenv)             ; ==> ((x . a))
 x                       ; ==> a
 
-; 'def'
+; 'def' writes the definition into the global environment,
+; regardless of what scope it is declared in.
 (def y 'b)   ; ==> y
 (exportenv)  ; ==> ((y . b) (x . a))
 x            ; ==> a
