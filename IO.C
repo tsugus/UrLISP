@@ -235,8 +235,6 @@ Index gc_makeAtom()
 {
   if (*txtp == '\'') /* Shorthand */
     return gc_makeatom_sub("quote ");
-  if (*txtp == '#' && '0' <= *(txtp + 1) && *(txtp + 1) <= '9')
-    return gc_makeatom_sub("num ");
   if (*txtp == '#' && *(txtp + 1) == '\'')
   {
     txtp++;
@@ -247,6 +245,8 @@ Index gc_makeAtom()
     txtp++;
     return gc_makeatom_sub("len ");
   }
+  if (*txtp == '#')
+    return gc_makeatom_sub("num ");
   return gc_getSymbol();
 }
 
