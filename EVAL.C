@@ -108,7 +108,7 @@ Index assoclist(Index keys, Index values)
 {
   Index indx;
 
-  if ((keys == Nil) || (values == Nil))
+  if (keys == Nil)
     return Nil;
   indx = Nil;
   push(keys);

@@ -1,5 +1,5 @@
 ;;;;; An Initial Program for UrLISP ;;;;;;
-;; Version 0.6.6
+;; Version 0.6.7
 ;; (C) 2025 Tsugu
 ;;;;;
 
@@ -125,7 +125,6 @@ a  ; ==> 200
 (def cdadr '(lambda (x) (cdr (cadr x))))
 (def cddar '(lambda (x) (cdr (cdar x))))
 (def cdddr '(lambda (x) (cdr (cddr x))))
-(def caddar '(lambda (x) (car (cddar x))))
 
 (def list
   '(lambda x x))
@@ -145,10 +144,6 @@ a  ; ==> 200
   '(lambda (x y)
      (cond (x 't) (t y))))
 
-(def imply
-  '(lambda (x y)
-     (cond (x y) (t 't))))
-
 (def rev-append
   ' (lambda (x y)
       (cond ((null x) y)
@@ -162,7 +157,7 @@ a  ; ==> 200
 
 (def assoclist
   '(lambda (keys values)
-     (cond ((or (null keys) (null values)) '())
+     (cond ((null keys) '())
            ((and (not (atom keys)) (not (atom values)))
             (cons (cons (car keys) (car values))
                   (assoclist (cdr keys) (cdr values))))
@@ -262,18 +257,19 @@ a  ; ==> 200
       '\0)))
 ;
 (def repl
-  '(lambda (an_eval)
+  '(lambda args
      ((lambda (flag)
         (do-while
          (not (eq flag 'ok))
+         (cond ((null args) (setq args '(eval))))
          (read-top)
          (cond
            ((not (atom (car top)))
             (cond
               ((not (eq 'exit (car (car top))))
-               (repl-body an_eval (car top)))
+               (repl-body (car args) (car top)))
               (t (setq flag 'ok))))
-           (t (repl-body an_eval (car top))))))
+           (t (repl-body (car args) (car top))))))
       't)))
 
 ; ===============================================
