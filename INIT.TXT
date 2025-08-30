@@ -1,5 +1,5 @@
 ;;;;; An Initial Program for UrLISP ;;;;;;
-;; Version 0.8.0
+;; Version 0.8.1
 ;; 2025 Tsugu
 ;;;;;
 
@@ -480,7 +480,7 @@ a  ; ==> 200
 ; =====================================
 'TEST_1
 
-(verbos '())
+(verbos 't)
 (repl<)
 
 (def reverse
@@ -515,19 +515,24 @@ a  ; ==> 200
 
 (< reverse < quote < 1 2 3 4 5 > > > >)
 (< subst < quote m > < quote b > < quote < a b < a b c > d > > > >)
-
-(importenv plisp1!5)
-
-(def list (< quote < lambda x x > >))
-
-;; Warning. Very slow.
-;; (This is probably because searching the global environment list is a linear search.)
-; (< eval < quote < list < quote a > < quote b > > > *env<* >)
-
 (exit)
 
 ; -------------------------------------
 'Test_2
+;; Warning. Very slow.
+;; (This is probably because searching the global environment list is a linear search.)
+
+; (verbos '())
+; (repl<)
+; (importenv plisp1!5)
+
+; (def list (< quote < lambda x x > >))
+
+; (< eval < quote < list < quote a > < quote b > > > *env<* >)
+; (exit)
+
+; -------------------------------------
+'Test_3
 
 (def infloop
   '(lambda () (infloop2)))

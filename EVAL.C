@@ -715,6 +715,7 @@ Error:
 Return:
   dpush(result);
   ec2;
+  expr = env = result = func = args = clauses = members = indx = Nil;
   if (r_stack_p >= 0)
     switch (rpop())
     {
