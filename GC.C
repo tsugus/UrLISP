@@ -110,7 +110,8 @@ void mark_and_sweep()
   for (i = 0; i < SYMBOLTABLE_SIZE; i++)
     symbol_table[i] = Nil;
   /* Scanning the S-expression, remove cells with a negative ID, and re-add the symbols to the empty table. */
-  purseS(environment);
+  for (i = 0; i < ENV_ARRAY_SIZE; i++)
+    purseS(env_array[i]);
   for (i = 0; i < Last; i++) /* 0 to 'Last'-1 are the indexes of reserved symbols */
     purseS(i);
   for (i = 0; i < sp; i++)

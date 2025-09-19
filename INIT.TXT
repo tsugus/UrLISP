@@ -1,5 +1,5 @@
 ;;;;; An Initial Program for UrLISP ;;;;;;
-;; Version 0.8.4
+;; Version 0.9.0
 ;; 2025 Tsugu
 ;;;;;
 
@@ -80,8 +80,8 @@ a  ; ==> 200
 
 ; Display a S-expression
 (display (cdr '(1 2 3)))  ; ==> (2 3)(2 3)
-;                                    ^^^^^
-;                                    return
+                          ;          ^^^^^
+                          ;          return
 (display '\0)  ; ==> no character
 (display '\s)  ; ==> a white space
 (display '\n)  ; ==> a new line
@@ -97,6 +97,9 @@ a  ; ==> 200
 ; len
 (len '(a a a b b))  ; ==> 5
 #='(a a a b b)      ; ==> 5
+
+; #' (Shorthand only. The "function" is not implemented.)
+'#'aaa  ; ==> '(function aaa) ==> (function aaa)
 
 ; =====================================
 ;; Basic Functions
@@ -132,6 +135,10 @@ a  ; ==> 200
 (def reverse
   '(lambda (x) (rev-append x '())))
 
+(def append
+  '(lambda (x y)
+     (rev-append (rev-append x '()) y)))
+
 (def pairlis*
   '(lambda (v e a)
      (cond ((null v) a)
@@ -157,63 +164,205 @@ a  ; ==> 200
            (t '()))))
 
 ; =====================================
-;; Virtual REPL
+;;; Line Lisp
 
-; The global environment list '*env*'
-(def *env* '((*env*)))
 
-; Add (x . y) to *env*.
-(def <<
+; (block '(< < 1 2 3 > 4 5 > 6 7)) ==> ((< < 1 2 3 > 4 5 >) < 6 7)
+; (block '(< < 1 2 3 > 4 5)) ==> ()
+; (block '(1 ! 2 3)) ==> (1 . 2)
+; (block '(1 2 3 4 5)) ==> (1 < 2 3 4 5)
+(def block
+  '(lambda (exp)
+     (cond ((eq '< (car exp))
+            (block-rec '(<) (list (car exp)) (cdr exp)))
+           (t
+            (cond ((eq '! (cadr exp)) (cons (car exp) (caddr exp)))
+                  (t (cons (car exp) (cons '< (cdr exp)))))))))
+
+
+(def block-rec
+  '(lambda (stack done exp)
+     (cond
+       ((null exp)
+        (cond
+          ((null stack) (cons (reverse done) exp))
+          (t '())))  ; irregular list
+       ((null stack)
+        (cond
+          ((null done) exp)
+          (t
+           (cond
+             ((eq '! (car exp)) (cons (reverse done) (cadr exp)))
+             (t (cons (reverse done) (cons '< exp)))))))
+       ((eq '< (car exp))
+        (block-rec (cons '< stack) (cons (car exp) done) (cdr exp)))
+       ((eq '> (car exp))
+        (block-rec (cdr stack) (cons (car exp) done) (cdr exp)))
+       (t
+        (block-rec stack (cons (car exp) done) (cdr exp))))))
+
+(def car<
+  '(lambda (x)
+     (cond ((eq '< (car x))
+            (cond ((eq '! (cadr x)) (car '()))
+                  ((eq '> (cadr x)) (car '()))
+                  (t (car (block (cdr x))))))
+           (t (car x)))))
+
+(def cdr<
+  '(lambda (x)
+     (cond ((eq '< (car x))
+            (cond
+              ((eq '! (cadr x)) (cdr '()))
+              ((eq '> (cadr x)) (cdr '()))
+              ((atom (cdr (block (cdr x)))) (cdr (block (cdr x))))
+              (t
+               (cond ((eq '> (caddr (block (cdr x)))) '())
+                     (t (cdr (block (cdr x))))))))
+           (t (cdr x)))))
+
+(def conect
+  '(lambda (x y)
+     (cond ((atom x) (cons x y))
+           (t (append x y)))))
+
+(def cons<
+  '(lambda (x y)
+     (cond
+       ((atom y)
+        (cond ((null y) (cons '< (conect x '(>))))
+              (t (cons '< (conect x (list '! y '>))))))
+       ((eq '< (car y))
+        (cons '< (conect x (cdr y))))
+       (t (cons '< (append (cons x y) '(>)))))))
+
+(def caar< '(lambda (x) (car< (car< x))))
+(def cadr< '(lambda (x) (car< (cdr< x))))
+(def cdar< '(lambda (x) (cdr< (car< x))))
+(def cddr< '(lambda (x) (cdr< (cdr< x))))
+(def caaar< '(lambda (x) (car< (caar< x))))
+(def caadr< '(lambda (x) (car< (cadr< x))))
+(def cadar< '(lambda (x) (car< (cdar< x))))
+(def caddr< '(lambda (x) (car< (cddr< x))))
+(def cdaar< '(lambda (x) (cdr< (caar< x))))
+(def cdadr< '(lambda (x) (cdr< (cadr< x))))
+(def cddar< '(lambda (x) (cdr< (cdar< x))))
+(def cdddr< '(lambda (x) (cdr< (cddr< x))))
+
+; (pairlis< '(< x y >) '(< 1 2 >) '(< < z ! 3 > >))
+;  ==> (< < x ! 1 > < y ! 2 > < z ! 3 > >)
+; (pairlis< '(< x y ! z >) '(< 1 2 3 4 5 >) '())
+;  ==> (< < x ! 1 > < y ! 2 > < z 3 4 5 > >)
+(def pairlis<
+  '(lambda(v e a)
+     (cond
+       ((null v) a)
+       ((atom v) (cons< (cons< v e) a))
+       (t (cons< (cons< (car< v) (car< e))
+                 (pairlis< (cdr< v) (cdr< e) a))))))
+
+(def assoc<
+  '(lambda (x a)
+     (cond ((null a) (error '1 x))
+           ((eq x (caar< a)) (car< a))
+           (t (assoc< x (cdr< a))))))
+
+(def eval<
+  '(lambda (e a)
+     (cond
+       ((eq e 't) 't)
+       ((eq e '()) '())
+       ((atom e) (cdr< (assoc< e a)))
+       ((isSUBR (car< e)) (apply< (car< e) (evlis< (cdr< e) a) a))
+       ((atom (car< e)) (apply< (car< e) (cdr< e) a))
+       ((eq (caar< e) 'lambda) (apply< (car< e) (evlis< (cdr< e) a) a))
+       (t (apply< (car< e) (cdr< e) a)))))
+
+(def apply<
+  '(lambda (fn args a)
+     (cond
+       ((atom fn)
+        (cond
+          ((eq fn 'quote) (car< args))
+          ((eq fn 'atom) (atom (car< args)))
+          ((eq fn 'eq) (eq (car< args) (cadr< args)))
+          ((eq fn 'car) (car< (car< args)))
+          ((eq fn 'cdr) (cdr< (car< args)))
+          ((eq fn 'cons) (cons< (car< args) (cadr< args)))
+          ((eq fn 'cond) (evcon< args a))
+          ((eq fn 'error) (error (car< args) (cadr< args)))
+          (t (eval< (cons< (cdr< (assoc< fn a)) args) a))))
+       ((eq (car< fn) 'label)
+        (eval< (cons< (caddr< fn) args)
+               (cons< (cons< (cadr< fn) (caddr< fn)) a)))
+       ((eq (car< fn) 'lambda)
+        (eval< (caddr< fn) (pairlis< (cadr< fn) args a)))
+       (t (error '2 (cons< fn args))))))
+
+(def evcon<
+  '(lambda (c a)
+     (cond ((null (eval< (caar< c) a)) (evcon< (cdr< c) a))
+           (t (eval< (cadar< c) a)))))
+
+(def evlis<
+  '(lambda (m a)
+     (cond ((null m) '())
+           (t (cons< (eval< (car< m) a) (evlis< (cdr< m) a))))))
+
+; =====================================
+;; Virtual REPL (for Line Lisp)
+
+; The global environment list '*env<*'
+(def *env<* '(< < *env<* > >))
+
+; Add (x . y) to *env<*.
+(def <<<
   '(lambda (x y)
      (begin
-       (rplacd *env* (cons (cons x y) (cdr *env*)))
-       (rplacd (car *env*) (cdr *env*))
+       (setq *env<* (cons< (cons< '*env<* (cons< (cons< x y) (cdr< *env<*)))
+                           (cons< (cons< x y) (cdr< *env<*))))
        x)))
 
-; Eval x on the environment "*env*".
-(def >> '(lambda (an_eval x) (an_eval x *env*)))
+; Eval x on the environment "*env<*".
+(def >> '(lambda (an_eval x) (an_eval x *env<*)))
 
 ; Import an environment.
-(def importenv!
+(def importenv<!
   '(lambda (env)
      (begin
-       (rplacd *env* env)
-       (rplacd (car *env*) env)
+       (setq *env<* (cons< (cons< '*env<* env) env))
        't)))
 
-; Export the environment "*env*".
+; Export the environment "*env<*".
 (def exportenv!
-  '(lambda ()
-     *env*))
+  '(lambda () *env<*))
 
-; Reset the environment "*env*".
-(def resetenv!
+; Reset the environment "*env<*".
+(def resetenv<!
   '(lambda ()
      (begin
-       (setq
-        *env*
-        (cons (cons '*env* '()) '()))  ; '((*env*)) won't work.
-       't)))
+       (setq *env<* '(< < *env<* > >))
+       t)))
 
 ; The holder of the top level S-expression
 (def *top* '(()))
 
 ; Virtual REPL
 ;
-(def repl-body
+(def repl-body<
   '(lambda (an_eval exp)
      (begin
        (cond
          ((not (atom exp))
           (cond
             ((eq 'importenv (car exp))
-             (display (importenv! (eval_ (cadr exp) (exportenv)))))
+             (display (importenv<! (eval_ (cadr exp) (exportenv)))))
             ((eq 'exportenv (car exp))
              (display (exportenv!)))
             ((eq 'resetenv (car exp))
-             (display (resetenv!)))
+             (display (resetenv<!)))
             ((eq 'def (car exp))
-             (display (<< (cadr exp) (eval_ (caddr exp) *env*))))
+             (display (<<< (cadr exp) (eval< (caddr exp) *env<*))))
             (t (display (>> an_eval exp)))))
          (t (display (>> an_eval exp))))
        (display '\n))))
@@ -226,823 +375,168 @@ a  ; ==> 200
        (prompt '>)
        '\0)))
 ;
-(def repl-loop
+(def repl-loop<
   '(lambda (an_eval)
      (begin
-       (repl-body an_eval (car *top*))
-       (repl an_eval))))
+       (repl-body< an_eval (car *top*))
+       (repl< an_eval))))
 ;
-(def repl
+(def repl<
   '(lambda args
      (begin
-       (cond ((null args) (setq args '(eval_))))
+       (cond ((null args) (setq args '(eval<))))
        (read-top)
        (cond
-         ((atom (car *top*)) (repl-loop (car args)))
+         ((atom (car *top*)) (repl-loop< (car args)))
          ((eq 'exit (car (car *top*))) 'ok)
-         (t (repl-loop (car args)))))))
-
-; ===============================================
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;                                               ;
-;                                               ;
-;      S t a c k  &  G O T O  S y s t e m       ;
-;                                               ;
-;                                               ;
-;                GOTO is freedom!               ;
-;     Don't be afraid of spaghetti programs,    ;
-;         because GOTO (or jump) makes          ;
-;       Tail Recursion Optimization easy.       ;
-;                                               ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-;; An Example of "Flowchart List"
-;
-; ((label START)
-;  <S-exp>
-;  ...
-;  <S-exp>
-;  (branch 'Name1 'Name2)
-;  (label Name1)
-;  <S-exp>
-;  ...
-;  <S-exp>
-;  (return)
-;  (label Name2)
-;  <S-exp>
-;  ...
-;  <S-exp>
-;  (goto 'START))
-;
-; Note:
-;  Each element is a S-exprresion.
-;  The "flow" cannot jump over labels.
-;  The first label must be "START".
-;  "Flowchart list" can be converted to "program list".
-;  If you give a name to a "program list" with "def",
-; you can call a subroutine with "call".
-;  "call" must specify a return label.
-;  "goto" is only valid within the same subroutine;
-; to go to another subroutine, use "jump."
-;
-;; An Example of "Program"
-;
-; ((START <S-exp> ... <S-exp> (branch 'Name1 'Name2))
-;  (Name1 <S-exp> ... <S-exp> (return))
-;  (Name2 <S-exp> ... <S-exp> (goto 'START)))
-;
-
-; convert a "flowchart list" to a "program list"
-(def prog<-flow
-  '(lambda (exp) (prog<-wolf '() '() (reverse exp))))
-
-(def prog<-wolf
-  '(lambda (lst terms exp)
-     (cond
-       ((atom exp) lst)
-       ((cond
-          ((not (atom (car exp))) (eq 'label (caar exp)))
-          (t '()))
-        (prog<-wolf (cons (cons (cadar exp) terms) lst) '() (cdr exp)))
-       (t (prog<-wolf lst (cons (car exp) terms) (cdr exp))))))
-
-; program counter "(label . function)"
-(def *PC* '(()))
-
-; data stack
-(def *dstack* '())
-
-; return stack
-(def *rstack* '())
-
-; push to the data stack
-(def dpush
-  '(lambda (v) (setq *dstack* (cons v *dstack*))))
-
-; push to the return stack
-(def rpush
-  '(lambda (v) (setq *rstack* (cons v *rstack*))))
-
-; pop from the data stack
-(def dpop
-  '(lambda ()
-     ((lambda (copy)
-        (begin
-          (setq *dstack* (cdr *dstack*))
-          (car copy)))
-      *dstack*)))
-
-; pop from the return stack
-(def rpop
-  '(lambda ()
-     ((lambda (copy)
-        (begin
-          (setq *rstack* (cdr *rstack*))
-          (car copy)))
-      *rstack*)))
-
-; goto
-(def goto
-  '(lambda (label)
-     (setq *PC* (cons label (cdr *PC*)))))
-
-; branch
-(def branch
-  '(lambda (yes no)
-     (goto (cond ((dpop) yes)
-                 (t no)))))
-
-; return
-(def return
-  '(lambda () (setq *PC* (rpop))))
-
-; call
-(def call
-  '(lambda (func return_label)
-     (begin
-       (rpush (cons return_label (cdr *PC*)))
-       (setq *PC* (cons 'START func)))))
-
-; jump
-(def jump
-  '(lambda (func)
-     (begin
-       (setq *PC* (cons 'START func)))))
-
-(def my_eval
-  '(lambda (exp) (eval_ exp (exportenv))))
-
-(def exec
-  '(lambda (terms)
-     (cond ((atom terms) 'ok)
-           (t (begin (my_eval (car terms))
-                     (exec (cdr terms)))))))
-
-(def run
-  '(lambda ()
-     (cond ((eq '() (car *PC*)) 'ok)
-           (t (begin
-                (exec (cdr (assoc* (car *PC*)
-                                   (my_eval (cdr *PC*)))))
-                (run))))))
-
-(def do
-  '(lambda (func)
-     (begin
-       (call func '())
-       (run)
-       (dpop))))
-
-;; Stack Operations
-
-; dup
-(def dup
-  '(lambda ()
-     (setq *dstack* (cons (car *dstack*) *dstack*))))
-
-; over
-(def over
-  '(lambda ()
-     (setq *dstack* (cons (cadr *dstack*) *dstack*))))
-
-; swap
-(def swap
-  '(lambda ()
-     (setq *dstack*
-           (cons (cadr *dstack*)
-                 (cons (car *dstack*)
-                       (cddr *dstack*))))))
-
-; rot
-(def rot
-  '(lambda ()
-     (setq *dstack*
-           (cons (caddr *dstack*)
-                 (cons (car *dstack*)
-                       (cons (cadr *dstack*)
-                             (cdddr *dstack*)))))))
-
-; .S
-(def dotS
-  '(lambda ()
-     (begin
-       (display *dstack*)
-       (display '\n))))
-
-; clear stacks and program counter
-(def clearsys
-  '(lambda ()
-     (begin
-       (setq *dstack* '())
-       (setq *rstack* '())
-       (setq *PC* '(())))))
-
-;; Stack Version "eval"
-
-(def eval_s
-  '(lambda (exp env)
-     (begin
-       (clearsys)
-       (dpush env)
-       (dpush exp)
-       (do 'eval__))))
-
-; -----------------------------------------------
-;; Pure LISP Interpreter for Stack & GOTO System
-
-(def eval__
-  (prog<-flow
-   '((label START)  ; *dstack* = [e a]
-     (dup)                     ; [e e a]
-     (dpush (eq (dpop) 't))    ; [(eq e 't) e a]
-     (branch 'T 'IS_NIL?)      ; [e a]
-
-     (label T)                 ; [e a]
-     (dpop)                    ; [a]
-     (dpop)                    ; []
-     (dpush 't)                ; [t]
-     (return)
-
-     (label IS_NIL?)           ; [e a]
-     (dup)                     ; [e e a]
-     (dpush (eq (dpop) '()))   ; [(eq e '()) e a]
-     (branch 'NIL 'IS_ATOM?)   ; [e a]
-
-     (label NIL)               ; [e a]
-     (dpop)                    ; [a]
-     (dpop)                    ; []
-     (dpush '())               ; [()]
-     (return)
-
-     (label IS_ATOM?)          ; [e a]
-     (dup)                     ; [e e a]
-     (dpush (atom (dpop)))     ; [(atom e) e a]
-     (branch 'ATOM 'IS_SUBR?)  ; [e a]
-
-     (label ATOM)              ; [e a]
-     (dpush
-      (cdr (assoc*
-            (dpop) (dpop))))   ; [(cdr (assoc* e a))]
-     (return)
-
-     (label IS_SUBR?)          ; [e a]
-     (dup)                     ; [e e a]
-     (dpush
-      (isSUBR (car (dpop))))   ; [(isSUBR (car e)) e a]
-     (branch 'APPLY_EV
-             'IS_FSUBR?)       ; [e a]
-
-     (label IS_FSUBR?)         ; [e a]
-     (dup)                     ; [e e a]
-     (dpush
-      (atom (car (dpop))))     ; [(atom (car e)) e a]
-     (branch 'APPLY
-             'IS_LAMBDA?)      ; [e a]
-
-     (label IS_LAMBDA?)        ; [e a]
-     (dup)                     ; [e e a]
-     (dpush
-      (eq (caar (dpop))
-          'lambda))            ; [(eq (caar e) 'lambda) e a]
-     (branch 'APPLY_EV
-             'APPLY)           ; [e a]
-
-     (label APPLY)             ; [e a]
-     (dup)                     ; [e e a]
-     (dpush (cdr (dpop)))      ; [(cdr e) e a]
-     (swap)                    ; [e (cdr e) a]
-     (dpush (car (dpop)))      ; [(car e) (cdr e) a]
-     (jump 'apply__)           ; [(apply (car e) (cdr e) a)]
-
-     (label APPLY_EV)          ; [e a]
-     (over)                    ; [a e a]
-     (over)                    ; [e a e a]
-     (dpush (cdr (dpop)))      ; [(cdr e) a e a]
-     (call 'evlis__
-           'APPLY_EV_2)        ; [(evlis (cdr e) a) e a]
-
-     (label APPLY_EV_2)        ; [(evlis (cdr e) a) e a]
-     (swap)                    ; [e (evlis (cdr e) a) a]
-     (dpush (car (dpop)))      ; [(car e) (evlis (cdr e) a) a]
-     (jump 'apply__))))        ; [(apply (car e) (evlis (cdr e) a) a)]
-
-
-(def apply__
-  (prog<-flow
-   '((label START)  ; *dstack* = [fn args a]
-     (dup)                     ; [fn fn args a]
-     (dpush (atom (dpop)))     ; [(atom fn) fn args a]
-     (branch 'IS_QUOTE?
-             'IS_LABEL?)       ; [fn args a]
-
-     (label IS_QUOTE?)         ; [fn args a]
-     (dup)                     ; [fn fn args a]
-     (dpush
-      (eq (dpop) 'quote))      ; [(eq fn 'quote) fn args a]
-     (branch 'QUOTE
-             'IS_ATOM?)        ; [fn args a]
-
-     (label QUOTE)             ; [fn args a]
-     (dpop)                    ; [args a]
-     (dpush (car (dpop)))      ; [(car args) a]
-     (swap)                    ; [a (car args)]
-     (dpop)                    ; [(car args)]
-     (return)
-
-     (label IS_ATOM?)          ; [fn args a]
-     (dup)                     ; [fn fn args a]
-     (dpush
-      (eq (dpop) 'atom))       ; [(eq fn 'atom) fn args a]
-     (branch 'ATOM 'IS_EQ?)    ; [fn args a]
-
-     (label ATOM)              ; [fn args a]
-     (dpop)                    ; [args a]
-     (dpush
-      (atom (car (dpop))))     ; [(atom (car args)) a]
-     (swap)                    ; [a (atom (car args))]
-     (dpop)                    ; [(atom (car args))]
-     (return)
-
-     (label IS_EQ?)            ; [fn args a]
-     (dup)                     ; [fn fn args a]
-     (dpush (eq (dpop) 'eq))   ; [(eq fn 'eq) fn args a]
-     (branch 'EQ 'IS_CAR?)     ; [fn args a]
-
-     (label EQ)                ; [fn args a]
-     (dpop)                    ; [args a]
-     (dup)                     ; [args args a]
-     (dpush
-      (eq (car (dpop))
-          (cadr (dpop))))      ; [(eq (car args) (cadr args)) a]
-     (swap)                    ; [a (eq (car args) (cadr args))]
-     (dpop)                    ; [(eq (car args) (cadr args))]
-     (return)
-
-     (label IS_CAR?)           ; [fn args a]
-     (dup)                     ; [fn fn args a]
-     (dpush
-      (eq (dpop) 'car))        ; [(eq fn 'car) fn args a]
-     (branch 'CAR 'IS_CDR?)    ; [fn args a]
-
-     (label CAR)               ; [fn args a]
-     (dpop)                    ; [args a]
-     (dpush
-      (car (car (dpop))))      ; [(car (car args)) a]
-     (swap)                    ; [a (car (car args))]
-     (dpop)                    ; [(car (car args))]
-     (return)
-
-     (label IS_CDR?)           ; [fn args a]
-     (dup)                     ; [fn fn args a]
-     (dpush
-      (eq (dpop) 'cdr))        ; [(eq fn 'cdr) fn args a]
-     (branch 'CDR 'IS_CONS?)   ; [fn args a]
-
-     (label CDR)               ; [fn args a]
-     (dpop)                    ; [args a]
-     (dpush
-      (cdr (car (dpop))))      ; [(cdr (car args)) a]
-     (swap)                    ; [a (cdr (car args))]
-     (dpop)                    ; [(cdr (car args))]
-     (return)
-
-     (label IS_CONS?)          ; [fn args a]
-     (dup)                     ; [fn fn args a]
-     (dpush
-      (eq (dpop) 'cons))       ; [(eq fn 'cons) fn args a]
-     (branch 'CONS 'IS_COND?)  ; [fn args a]
-
-     (label CONS)              ; [fn args a]
-     (dpop)                    ; [args a]
-     (dup)                     ; [args args a]
-     (dpush
-      (cons (car (dpop))
-            (cadr (dpop))))    ; [(cons (car args) (cadr args)) a]
-     (swap)                    ; [a (cons (car args) (cadr args))]
-     (dpop)                    ; [(cons (car args) (cadr args))]
-     (return)
-
-     (label IS_COND?)          ; [fn args a]
-     (dup)                     ; [fn fn args a]
-     (dpush
-      (eq (dpop) 'cond))       ; [(eq fn 'cond) fn args a]
-     (branch 'COND
-             'IS_ERROR?)       ; [fn args a]
-
-     (label COND)              ; [fn args a]
-     (dpop)                    ; [args a]
-     (jump 'evcon__)           ; [(evcon args a)]
-
-     (label IS_ERROR?)         ; [fn args a]
-     (dup)                     ; [fn fn args a]
-     (dpush
-      (eq (dpop) 'error))      ; [(eq fn 'error) fn args a]
-     (branch 'ERROR
-             'FUNCTION)        ; [fn args a]
-
-     (label ERROR)             ; [fn args a]
-     (dpop)                    ; [args a]
-     (dup)                     ; [args args a]
-     (dpush
-      (error (car (dpop))
-             (cadr (dpop))))   ; [(error (car args) (cadr args)) a]
-     (swap)                    ; [a (error (dpop) (dpop))]
-     (dpop)                    ; [(error (dpop) (dpop))]
-     (return)
-
-     (label FUNCTION)          ; [fn args a]
-     (rot)                     ; [a fn args]
-     (dup)                     ; [a a fn args]
-     (rot)                     ; [fn a a args]
-     (dpush
-      (cdr (assoc*
-            (dpop) (dpop))))   ; [(cdr (assoc* fn a)) a args]
-     (rot)                     ; [args (cdr (assoc* fn a)) a]
-     (swap)                    ; [(cdr (assoc* fn a)) args a]
-     (dpush
-      (cons (dpop) (dpop)))    ; [(cons (cdr (assoc* fn a)) args) a]
-     (jump 'eval__)            ; [(eval (cons (cdr (assoc* fn a)) args) a)]
-
-     (label IS_LABEL?)         ; [fn args a]
-     (dup)                     ; [fn fn args a]
-     (dpush
-      (eq (car (dpop))
-          'label))             ; [(eq (car fn) 'label) fn args a]
-     (branch 'LABEL_
-             'IS_LAMBDA?)      ; [fn args a]
-
-     (label LABEL_)            ; [fn args a]
-     (rot)                     ; [a fn args]
-     (over)                    ; [fn a fn args]
-     (dup)                     ; [fn fn a fn args]
-     (dpush
-      (cons
-       (cons (cadr (dpop))
-             (caddr (dpop)))
-       (dpop)))                ; [(cons (cons (cadr fn) (caddr fn)) a) fn args]
-     (rot)                     ; [args (cons (cons (cadr fn) (caddr fn)) a) fn]
-     (rot)                     ; [fn args (cons (cons (cadr fn) (caddr fn)) a)]
-     (dpush
-      (cons (caddr (dpop))
-            (dpop)))           ; [(cons (caddr fn) args) (cons (cons (cadr fn) (caddr fn)) a)]
-     (jump 'eval__)            ; [(eval (cons (caddr fn) args) (cons (cons (cadr fn) (caddr fn)) a))]
-
-     (label IS_LAMBDA?)        ; [fn args a]
-     (dup)                     ; [fn fn args a]
-     (dpush
-      (eq (car (dpop))
-          'lambda))            ; [(eq (car fn) 'lambda) fn args a]
-     (branch 'LAMBDA
-             'OTHER_FORM)      ; [fn args a]
-
-     (label LAMBDA)            ; [fn args a]
-     (dup)                     ; [fn fn args a]
-     (rpush (dpop))            ; [fn args a]
-     (rot)                     ; [a fn args]
-     (rot)                     ; [args a fn]
-     (dpush (rpop))            ; [fn args a fn]
-     (dpush
-      (pairlis*
-       (cadr (dpop)) (dpop)
-       (dpop)))                ; [(pairlis* (cadr fn) args a) fn]
-     (swap)                    ; [fn (pairlis* (cadr fn) args a)]
-     (dpush (caddr (dpop)))    ; [(caddr fn) (pairlis* (cadr fn) args a)]
-     (jump 'eval__)            ; [(eval (caddr fn) (pairlis* (cadr fn) args a))]
-
-     (label OTHER_FORM)        ; [fn args a]
-     (dpush
-      (error
-       '2
-       (cons (dpop) (dpop))))  ; [(error '2 (cons fn args)) a]
-     (swap)                    ; [a (error '2 (cons fn args))]
-     (dpop)                    ; [(error '2 (cons fn args))]
-     (return))))
-
-
-(def evcon__
-  (prog<-flow
-   '((label START)  ; *dstack* = [c a]
-     (over)                    ; [a c a]
-     (over)                    ; [c a c a]
-     (dpush (caar (dpop)))     ; [(caar c) a c a]
-     (call 'eval__
-           'IS_FALSE?)         ; [(eval (caar c) a) c a]
-
-     (label IS_FALSE?)         ; [(eval (caar c) a) c a]
-     (dpush (null (dpop)))     ; [(null (eval (caar c) a)) c a]
-     (branch 'NEXT 'EXECUTE)   ; [c a]
-
-     (label NEXT)              ; [c a]
-     (dpush (cdr (dpop)))      ; [(cdr c) a]
-     (jump 'evcon__)           ; [(evcon (cdr c)) a]
-
-     (label EXECUTE)           ; [c a]
-     (dpush (cadar (dpop)))    ; [(cadar c) a]
-     (jump 'eval__)            ; [(eval (cadar c)) a]
-     )))
-
-
-(def evlis__
-  (prog<-flow
-   '((label START)  ; *dstack* = [m a]
-     (dup)                     ; [m m a]
-     (dpush (null (dpop)))     ; [(null m) m a]
-     (branch 'EMPTY 'NEXT)     ; [m a]
-
-     (label EMPTY)             ; [m a]
-     (dpop)                    ; [a]
-     (dpop)                    ; []
-     (dpush '())               ; [()]
-     (return)
-
-     (label NEXT)              ; [m a]
-     (over)                    ; [a m a]
-     (over)                    ; [m a m a]
-     (dpush (cdr (dpop)))      ; [(cdr m) a m a]
-     (call 'evlis__ 'EVAL)     ; [(evlis (cdr m) a) m a]
-
-     (label EVAL)              ; [(evlis (cdr m) a) m a]
-     (rot)                     ; [a (evlis (cdr m) a) m]
-     (rot)                     ; [m a (evlis (cdr m) a)]
-     (dpush (car (dpop)))      ; [(car m) a (evlis (cdr m) a)]
-     (call 'eval__ 'CONS)      ; [(eval (car m) a) (evlis (cdr m) a)]
-
-     (label CONS)              ; [(eval (car m) a) (evlis (cdr m) a)]
-     (dpush
-      (cons (dpop) (dpop)))    ; [(cons (eval (car m) a) (evlis (cdr m) a))]
-     (return))))
+         (t (repl-loop< (car args)))))))
 
 ; =====================================
-;; Meta Circular Evaluator (self environment list)
+;; A meta-circular pure LISP program "plisp 1.5"
+;  (Line Lisp version)
 
-(def plisp2
-  '(
-    (caar . (lambda (x) (car (car x))))
-    (cadr . (lambda (x) (car (cdr x))))
-    (cdar . (lambda (x) (cdr (car x))))
-    (cddr . (lambda (x) (cdr (cdr x))))
-    (caaar . (lambda (x) (car (caar x))))
-    (caadr . (lambda (x) (car (cadr x))))
-    (cadar . (lambda (x) (car (cdar x))))
-    (caddr . (lambda (x) (car (cddr x))))
-    (cdaar . (lambda (x) (cdr (caar x))))
-    (cdadr . (lambda (x) (cdr (cadr x))))
-    (cddar . (lambda (x) (cdr (cdar x))))
-    (cdddr . (lambda (x) (cdr (cddr x))))
-    (list
-     . (lambda x x))
-    (null
-     . (lambda (x) (eq x '())))
-    (not
-     . (lambda (x)
-         (cond (x '()) (t 't))))
-    (pairlis*
-     . (lambda (v e a)
-         (cond ((null v) a)
-               ((atom v) (cons (cons v e) a))
-               (t (cons (cons (car v) (car e))
-                        (pairlis* (cdr v) (cdr e) a))))))
-    ; (error
-    ;  . (lambda (err-code s-exp)
-    ;      (Return a nil with outputing an error code and a S-expression.)))
-    (assoc*
-     . (lambda (x a)
-         (cond ((null a) (error '1 x))
-               ((eq x (caar a)) (car a))
-               (t (assoc* x (cdr a))))))
-    (isSUBR
-     . (lambda (x)
-         (cond ((eq x 'atom) 't)
-               ((eq x 'eq) 't)
-               ((eq x 'car) 't)
-               ((eq x 'cdr) 't)
-               ((eq x 'cons) 't)
-               ((eq x 'apply) 't)
-               ((eq x 'error) 't)
-               (t '()))))
-    (eval
-     . (lambda (e a)
-         (cond
-           ((eq e 't) 't)
-           ((eq e '()) '())
-           ((atom e) (cdr (assoc* e a)))
-           ((isSUBR (car e)) (apply (car e) (evlis (cdr e) a) a))
-           ((atom (car e)) (apply (car e) (cdr e) a))
-           ((eq (caar e) 'lambda) (apply (car e) (evlis (cdr e) a) a))
-           ((eq (caar e) 'funarg) (apply (car e) (evlis (cdr e) a) a))
-           (t (apply (car e) (cdr e) a)))))
-    (apply
-     . (lambda (fn args a)
-         (cond
-           ((atom fn)
-            (cond
-              ((eq fn 'quote) (car args))
-              ((eq fn 'atom) (atom (car args)))
-              ((eq fn 'eq) (eq (car args) (cadr args)))
-              ((eq fn 'car) (car (car args)))
-              ((eq fn 'cdr) (cdr (car args)))
-              ((eq fn 'cons) (cons (car args) (cadr args)))
-              ((eq fn 'cond) (evcon args a))
-              ((eq fn 'apply) (apply (car args) (cadr args) a))
-              ((eq fn 'function) (list 'funarg (car args) a))
-              ((eq fn 'error) (error (car args) (cadr args)))
-              (t (eval (cons (cdr (assoc* fn a)) args) a))))
-           ((eq (car fn) 'label)
-            (eval (cons (caddr fn) args)
-                  (cons (cons (cadr fn) (caddr fn)) a)))
-           ((eq (car fn) 'lambda)
-            (eval (caddr fn) (pairlis* (cadr fn) args a)))
-           ((eq (car fn) 'funarg)
-            (apply (cadr fn) args (caddr fn)))
-           (t (error '2 (cons fn args))))))
-    (evcon
-     . (lambda (c a)
-         (cond ((null (eval (caar c) a)) (evcon (cdr c) a))
-               (t (eval (cadar c) a)))))
-    (evlis
-     . (lambda (m a)
-         (cond ((null m) '())
-               (t (cons (eval (car m) a) (evlis (cdr m) a))))))
-    ; The following are options
-    (funcall
-     . (lambda (f . x) (apply f x)))
-    (z-combi   ; Z-combinator
-     . (lambda (f)
-         ((lambda (x) (f (function (lambda y (apply (x x) y)))))
-          (function (lambda (x)
-                      (f (function (lambda y (apply (x x) y)))))))))
-    ))
+(def plisp1!5
+  '(<
+    < caar lambda < x > < car < car x > > >
+    < cadr lambda < x > < car < cdr x > > >
+    < cdar lambda < x > < cdr < car x > > >
+    < cddr lambda < x > < cdr < cdr x > > >
+    < caaar lambda < x > < car < caar x > > >
+    < caadr lambda < x > < car < cadr x > > >
+    < cadar lambda < x > < car < cdar x > > >
+    < caddr lambda < x > < car < cddr x > > >
+    < cdaar lambda < x > < cdr < caar x > > >
+    < cdadr lambda < x > < cdr < cadr x > > >
+    < cddar lambda < x > < cdr < cdar x > > >
+    < cdddr lambda < x > < cdr < cddr x > > >
+    < null
+       lambda < x > < eq x () > >
+    < not
+       lambda < x >
+         < cond < x () > < t t > > >
+    < pairlis
+       lambda < v e a >
+         < cond < < null v > a >
+                < < atom v > < cons < cons v e > a > >
+                < t < cons < cons < car v > < car e > >
+                           < pairlis < cdr v > < cdr e > a > > > > >
+    < assoc
+       lambda < x a >
+         < cond < < null a > < error < quote 1 > x > >
+                < < eq x < caar a > > < car a > >
+                < t < assoc x < cdr a > > > > >
+    ; < error
+    ;    lambda < err-code s-exp >
+    ;      < Return a nil with outputing an error code and a S-expression. > >
+    < isSUBR
+       lambda < x >
+         < cond < < eq x < quote atom > > t >
+                < < eq x < quote eq > > t >
+                < < eq x < quote car > > t >
+                < < eq x < quote cdr > > t >
+                < < eq x < quote cons > > t >
+                < < eq x < quote error > > t >
+                < t () > > >
+    < eval
+       lambda < e a >
+         < cond
+           < < eq e < quote t > > < quote t > >
+           < < eq e < quote () > > < quote () > >
+           < < atom e > < cdr < assoc e a > > >
+           < < isSUBR < car e > > < apply < car e > < evlis < cdr e > a > a > >
+           < < atom < car e > > < apply < car e > < cdr e > a > >
+           < < eq < caar e > < quote lambda > > < apply < car e > < evlis < cdr e > a > a > >
+           < t < apply < car e > < cdr e > a > > > >
+    < apply
+       lambda < fn args a >
+         < cond
+           < < atom fn >
+             < cond
+               < < eq fn < quote quote > > < car args > >
+               < < eq fn < quote atom > > < atom < car args > > >
+               < < eq fn < quote eq > > < eq < car args > < cadr args > > >
+               < < eq fn < quote car > > < car < car args > > >
+               < < eq fn < quote cdr > > < cdr < car args > > >
+               < < eq fn < quote cons > > < cons < car args > < cadr args > > >
+               < < eq fn < quote cond > > < evcon args a > >
+               < < eq fn < quote error > > < error < car args > < cadr args > > >
+               < t < eval < cons < cdr < assoc fn a > > args > a > > > >
+           < < eq < car fn > < quote label > >
+             < eval < cons < caddr fn > args >
+                    < cons < cons < cadr fn > < caddr fn > > a > > >
+           < < eq < car fn > < quote lambda > >
+             < eval < caddr fn > < pairlis < cadr fn > args a > > >
+           < t < error < quote 2 > < cons fn args > > > > >
+    < evcon
+       lambda < c a >
+         < cond < < null < eval < caar c > a > > < evcon < cdr c > a > >
+                < t < eval < cadar c > a > > > >
+    < evlis
+       lambda < m a >
+         < cond < < null m > () >
+                < t < cons < eval < car m > a > < evlis < cdr m > a > > > > >
+    >))
 
 ; =====================================
-
-(def calc
-  '(
-    (+1
-     . (lambda (x) (cons 't x)))
-    (-1
-     . (lambda (x)
-         (cond ((eq #0 x) '())
-               (t (cdr x)))))
-    (+
-     . (lambda (x y)
-         (cond ((eq #0 y) x)
-               (t (+ (+1 x) (-1 y))))))
-    (*
-     . (lambda (x y)
-         ((label *rec
-                 (lambda (x y acc)
-                   (cond ((eq #0 y) acc)
-                         (t (*rec x (-1 y) (+ acc x))))))
-          x y '())))
-    (-
-     . (lambda (x y)
-         (cond ((eq #0 y) x)
-               (t (- (-1 x) (-1 y))))))
-    (|-|
-     . (lambda (x y)
-         (+ (- x y) (- y x))))
-    (=
-     . (lambda (x y)
-         (eq #0 (|-| x y))))
-    (<
-     . (lambda (x y)
-         (cond ((- y x) 't))))
-    (>
-     . (lambda (x y)
-         (cond ((- x y) 't))))
-    (/
-     . (lambda (x y)
-         ((label /rec
-                 (lambda (x y acc)
-                   (cond ((< x y) acc)
-                         (t (/rec (- x y) y (+1 acc))))))
-          x y '())))
-    (%
-     . (lambda (x y)
-         (cond ((< x y) x)
-               ((= x y) #0)
-               (t (% (- x y) y)))))
-    (fibo
-     . (lambda (n)
-         ((label fibo-rec
-                 (lambda (n pre sum)
-                   (cond
-                     ((eq #0 n) sum)
-                     (t (fibo-rec (-1 n) sum (+ pre sum))))))
-          n #1 #0)))
-    ))
-
-; -------------------------------------
-;; TEST
-
-; - - - - - - - - - - - - - - - - - - -
 'TEST_1
 
-(repl)
-(importenv calc)
-#=(fibo #0)
-#=(fibo #1)
-#=(fibo #2)
-#=(fibo #3)
-#=(fibo #4)
-#=(fibo #5)
-#=(fibo #6)
-#=(fibo #7)
-#=(fibo #8)
-(exit)
+(verbos 't)
+(repl<)
 
-; - - - - - - - - - - - - - - - - - - -
-'TEST_2
-
-(repl)
-(importenv plisp2)
 (def reverse
-  '(lambda (x)
-     ((label
-       rec
-       (lambda (x y)
-         (cond ((null x) y)
-               (t (rec (cdr x) (cons (car x) y))))))
-      x '())))
-(reverse '(1 2 3 4 5))
-(exit)
-(repl 'eval_s)
-(reverse '(1 2 3 4 5))
-(exit)
+  (< quote
+     < lambda < x >
+       < < label
+           rec
+           < lambda < x y >
+           < cond
+             < < eq () x >
+               y >
+             < t
+               < rec < cdr x >
+                     < cons < car x > y > > > > > >
+         x () > > >))
 
-(repl)
-(importenv plisp2)
-(def reverse
-  '(lambda (x)
-     (funcall
-      (z-combi
-       #'(lambda (f)
-           #'(lambda (x y)
-               (cond
-                 ((null x) y)
-                 (t (f (cdr x)
-                       (cons (car x) y)))))))
-      x '())))
-(eval '(reverse '(1 2 3 4 5)) *env*)
+(def subst
+  (< quote
+     < label
+       subst
+       < lambda < x y z >
+           < cond
+             < < atom z >
+               < cond
+                 < < eq z y >
+                   x >
+                 < t
+                   z > > >
+             < t
+               < cons < subst x y < car z > >
+                      < subst x y < cdr z > > > > > > > >))
 
-(def append
-  '(lambda (l m)
-     ((lambda (cont)
-        (funcall
-         (z-combi
-          #'(lambda (f)
-              #'(lambda (l m cont)
-                  (cond
-                    ((null l)
-                     (cont m))
-                    (t (f (cdr l)
-                          m
-                          #'(lambda (x)
-                              (cont (cons (car l) x)))))))))
-         l m cont))
-      #'(lambda (x) x))))
-(eval '(append '(a b c) '(d e)) *env*)
+(< reverse < quote < 1 2 3 4 5 > > > >)
+(< subst < quote m > < quote b > < quote < a b < a b c > d > > > >)
 (exit)
 
-; - - - - - - - - - - - - - - - - - - -
-'TEST_3
+; -------------------------------------
+'Test_2
+;; Warning. Very slow.
 
-(repl 'eval_s)
-(resetenv)
+; (verbos 't)
+; (repl<)
+; (importenv plisp1!5)
 
-((lambda (x)
-   ((label
-     rev
-     (lambda (x y)
-       (cond ((eq '() x) y)
-             (t (rev (cdr x) (cons (car x) y))))))
-    x '()))
- '(1 2 3 4 5))
+; (def list (< quote < lambda x x > >))
 
-((label
-  subst
-  (lambda (x y z)
-    (cond ((atom z) (cond ((eq z y) x)
-                          (t z)))
-          (t (cons (subst x y (car z))
-                   (subst x y (cdr z)))))))
- 'm 'b '(a b (a b c) d))
+; (< eval < quote < list < quote a > < quote b > > > *env<* >)
+; (exit)
 
-(exit)
+; -------------------------------------
+'Test_3
 
-; - - - - - - - - - - - - - - - - - - -
-'TEST_4
-
-(repl 'eval_s)
-(resetenv)
 (def infloop
   '(lambda () (infloop2)))
 (def infloop2
   '(lambda () (infloop)))
-(exit)
-; (repl 'eval_) (infloop)
-;   --> "The software stack overflowed."
-; (repl 'eval_s) (infloop)
-;   -->  TRO achieved! Please press Ctrl+C.
-
-; -------------------------------------
+(verbos 't)
+; (infloop)
+;;   -->  TRO achieved! Please press Ctrl+C.

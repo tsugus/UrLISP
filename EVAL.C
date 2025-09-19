@@ -146,10 +146,20 @@ Index pairlis(Index keys, Index values, Index lst)
   return rev_append(rev_pairs(keys, values), lst);
 }
 
-Index assoc(Index key, Index lst)
+int hash_for_env(Index x)
 {
+  return x % ENV_ARRAY_SIZE;
+}
+
+/* Searches for a pair containing key in the array 'env_array',
+   which is the global environment list. */
+Index global_assoc(Index key)
+{
+  Index lst;
+
   if (!is(key, SYMBOL))
     return error("A key is not an symbol.");
+  lst = env_array[hash_for_env(key)];
   for (; lst != Nil; lst = cdr(lst))
     if (key == car(car(lst)))
       return car(lst);
@@ -158,15 +168,28 @@ Index assoc(Index key, Index lst)
   return Nil;
 }
 
+Index assoc(Index key, Index lst)
+{
+  if (!is(key, SYMBOL))
+    return error("A key is not an symbol.");
+  for (; lst != Nil; lst = cdr(lst))
+    if (key == car(car(lst)))
+      return car(lst);
+  return global_assoc(key);
+}
+
 Index def(Index var, Index val)
 {
   Index env;
+  int hash_v;
 
   if (!is(var, SYMBOL))
     return error("A variable is not an symbol.");
   push(var);
   ec;
-  environment = cons(cons(var, val), environment);
+  hash_v = hash_for_env(var);
+  env_array[hash_v] =
+      cons(cons(var, val), env_array[hash_v]);
   ec;
   pop();
   return var;
@@ -174,13 +197,47 @@ Index def(Index var, Index val)
 
 Index setq(Index var, Index val, Index lst)
 {
+  Index pair;
+
   if (!is(var, SYMBOL))
     return error("A variable is not an symbol.");
-  for (; lst != Nil; lst = cdr(lst))
-    if (var == car(car(lst)))
-      return cdr(rplacd(car(lst), val));
-  error_(Num1, var);
-  return Nil;
+  pair = assoc(var, lst);
+  if (pair == Nil)
+    return Nil;
+  return cdr(rplacd(pair, val));
+}
+
+Index importenv(Index env)
+{
+  int i;
+
+  for (i = 0; i < ENV_ARRAY_SIZE; i++)
+    env_array[i] = Nil;
+  push(env);
+  ec;
+  env = rev_append(env, Nil);
+  ec;
+  for (; env != Nil; env = cdr(env))
+  {
+    def(car(car(env)), cdr(car(env)));
+    ec;
+  }
+  pop();
+  return T;
+}
+
+Index exportenv()
+{
+  Index result;
+  int i;
+
+  result = Nil;
+  for (i = ENV_ARRAY_SIZE - 1; i >= 0; i--)
+  {
+    result = append(env_array[i], result);
+    ec;
+  }
+  return result;
 }
 
 Index num(Index arg)
@@ -483,6 +540,7 @@ Apply:
       env = dpop(); /* restore */
       ec2;
       result = def(car(args), indx);
+      ec2;
       break;
     case Setq:
       check_2_args(args);
@@ -552,11 +610,12 @@ Apply:
       break;
     case ImportEnv:
       check_1_arg(args);
-      environment = car(args);
-      result = T;
+      result = importenv(car(args));
+      ec2;
       break;
     case ExportEnv:
-      result = environment;
+      result = exportenv();
+      ec2;
       break;
     case Quit:
       result = quit();

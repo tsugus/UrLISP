@@ -7,14 +7,15 @@
 /*                      (C) 2025 Tsugu */
 /*                                     */
 
-#define CELLS_SIZE 0x20000  /* Total number of cells */
-#define STACK_SIZE 0x5000   /* Size of the stack for Gabage Collection */
-#define D_STACK_SIZE 0x3000 /* Data stack size */
-#define R_STACK_SIZE 0x1500 /* Retrun stack size */
-#define TEXTBUF_SIZE 400    /* Input text buffer */
-#define SYMBOLTABLE_SIZE 64 /* Size of the hash table for symbols */
-#define PROMPT_LEN 11       /* The length of the prompt */
-#define tag(x) (tags[x])    /* Tag to store ID */
+#define CELLS_SIZE 0x20000   /* Total number of cells */
+#define STACK_SIZE 0x5000    /* Size of the stack for Gabage Collection */
+#define D_STACK_SIZE 0x3000  /* Data stack size */
+#define R_STACK_SIZE 0x1500  /* Retrun stack size */
+#define TEXTBUF_SIZE 400     /* Input text buffer */
+#define SYMBOLTABLE_SIZE 512 /* Size of the hash table for symbols */
+#define PROMPT_LEN 11        /* The length of the prompt */
+#define ENV_ARRAY_SIZE 256   /* The size of the global environment array */
+#define tag(x) (tags[x])     /* Tag to store ID */
 #define car(x) (cells[x].pair.car).index
 #define cdr(x) (cells[x].pair.cdr).index
 #define cas(x) (cells[x].pair.car).string
@@ -110,10 +111,10 @@ extern Index symbol_table[SYMBOLTABLE_SIZE];
 extern int err;
 extern char *message;
 extern FILE *ifp;
-extern int sp;                  /* The stack pointer for GC */
-extern Index environment;       /* The Environment list */
-extern int display_GC;          /* flag */
-extern char prompt[PROMPT_LEN]; /* The prompt */
+extern int sp;                          /* The stack pointer for GC */
+extern Index env_array[ENV_ARRAY_SIZE]; /* The global environment array */
+extern int display_GC;                  /* flag */
+extern char prompt[PROMPT_LEN];         /* The prompt */
 /* data stack & return stack */
 extern Index d_stack[D_STACK_SIZE];
 extern int d_stack_p;
