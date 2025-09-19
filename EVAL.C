@@ -6,14 +6,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include "LISP.H"
-#define check_1_arg(x)                    \
-  if (!is(x, CELL))                       \
-    return error("Not enough arguments"); \
-  ec
-#define check_2_args(x)                   \
-  if (!is(x, CELL) || !is(cdr(x), CELL))  \
-    return error("Not enough arguments"); \
-  ec
+#define ec2 \
+  if (err)  \
+  goto Error
+#define check_1_arg(x)             \
+  if (!is(x, CELL))                \
+    error("Not enough arguments"); \
+  ec2
+#define check_2_args(x)                  \
+  if (!is(x, CELL) || !is(cdr(x), CELL)) \
+    error("Not enough arguments");       \
+  ec2
 
 void print_error(Index exp, char *msg)
 {
@@ -151,6 +154,7 @@ Index assoc(Index key, Index lst)
     if (key == car(car(lst)))
       return car(lst);
   error_(Num1, key);
+  err = print_no_more;
   return Nil;
 }
 
@@ -158,80 +162,25 @@ Index def(Index var, Index val)
 {
   Index env;
 
+  if (!is(var, SYMBOL))
+    return error("A variable is not an symbol.");
   push(var);
   ec;
-  env = cons(cons(var, val), environment);
+  environment = cons(cons(var, val), environment);
   ec;
-  if (env != Nil) /* A workaround for unquoted lambda expressions clearing the environment list. */
-    environment = env;
   pop();
   return var;
 }
 
-Index setq(Index key, Index val, Index lst)
+Index setq(Index var, Index val, Index lst)
 {
-  if (!is(key, SYMBOL))
-    return error("A key is not an symbol.");
+  if (!is(var, SYMBOL))
+    return error("A variable is not an symbol.");
   for (; lst != Nil; lst = cdr(lst))
-    if (key == car(car(lst)))
+    if (var == car(car(lst)))
       return cdr(rplacd(car(lst), val));
-  error_(Num1, key);
+  error_(Num1, var);
   return Nil;
-}
-
-Index while_(Index cndt, Index bodies, Index env)
-{
-  Index Ss, result;
-
-  push(cndt);
-  ec;
-  push(bodies);
-  ec;
-  push(env);
-  ec;
-  result = Nil;
-  while (eval(cndt, env) != Nil)
-  {
-    for (Ss = bodies; Ss != Nil; Ss = cdr(Ss))
-    {
-      push(Ss);
-      ec;
-      result = eval(car(Ss), env);
-      ec;
-      pop();
-    }
-  }
-  pop();
-  pop();
-  pop();
-  return result;
-}
-
-Index dowhile(Index cndt, Index bodies, Index env)
-{
-  Index Ss, result;
-
-  push(cndt);
-  ec;
-  push(bodies);
-  ec;
-  push(env);
-  ec;
-  do
-  {
-    for (Ss = bodies; Ss != Nil; Ss = cdr(Ss))
-    {
-      push(Ss);
-      ec;
-      result = eval(car(Ss), env);
-      ec;
-      pop();
-    }
-  } while (eval(cndt, env) != Nil);
-  pop();
-  pop();
-  pop();
-  return result;
 }
 
 Index num(Index arg)
@@ -325,194 +274,465 @@ Index isSUBR(Index x)
   }
 }
 
-Index evcon(Index clauses, Index env)
+void dpush(Index x)
 {
-  for (; clauses != Nil; clauses = cdr(clauses))
+  if (++d_stack_p >= D_STACK_SIZE)
   {
-    if (is(clauses, SYMBOL))
-      return error("Invalid clause");
-    if (is(car(clauses), SYMBOL))
-      return error("Invalid clause");
-    if (eval(car(car(clauses)), env) != Nil)
-    {
-      if (atom(cdr(car(clauses))) == T)
-        return eval(car(car(clauses)), env);
-      return eval(car(cdr(car(clauses))), env);
-    }
+    d_stack_p = -1;
+    error("The data stack is overflowed.");
   }
-  return Nullchar; /* Meaning undefined. */
+  d_stack[d_stack_p] = x;
 }
 
-Index evlis(Index members, Index env)
+Index dpop()
 {
-  Index indx;
-
-  for (indx = Nil; members != Nil; members = cdr(members))
+  if (d_stack_p-- < 0)
   {
-    push(indx);
-    ec;
-    indx = cons(eval(car(members), env), indx);
-    ec;
-    pop();
+    d_stack_p = -1;
+    return error("The data stack is empty.");
   }
-  return rev_append(indx, Nil);
+  return d_stack[d_stack_p + 1];
 }
 
-Index eval(Index exp, Index env)
+void rpush(char x)
 {
-  Index result;
+  if (++r_stack_p == R_STACK_SIZE)
+  {
+    r_stack_p = -1;
+    error("The return stack is overflowed.");
+  }
+  r_stack[r_stack_p] = x;
+}
 
-  push(exp);
-  ec;
-  push(env);
-  ec;
-  if (exp == T)
+char rpop()
+{
+  if (r_stack_p-- < 0)
+  {
+    r_stack_p = -1;
+    return error("The return stack is empty.");
+  }
+  return r_stack[r_stack_p + 1];
+}
+
+Index eval(Index exp_, Index env_)
+{
+  d_stack_p = -1;
+  r_stack_p = -1;
+  dpush(env_);
+  ec2;
+  dpush(exp_);
+  ec2;
+
+/***** eval *****/
+Eval:
+  expr = dpop();
+  env = dpop();
+  if (expr == T)
     result = T;
-  else if (exp == Nil)
+  else if (expr == Nil)
     result = Nil;
-  else if (atom(exp) == T)
-    result = cdr(assoc(exp, env));
-  else if (isSUBR(car(exp)) == T ||
-           (atom(car(exp)) != T && car(car(exp)) == Lambda))
-    result = apply(car(exp), evlis(cdr(exp), env), env);
-  else
-    result = apply(car(exp), cdr(exp), env);
-  if (err == on)
+  else if (atom(expr) == T)
+    result = cdr(assoc(expr, env));
+  else if (isSUBR(car(expr)) == T ||
+           (atom(car(expr)) != T && car(car(expr)) == Lambda))
   {
-    print_error(exp, message);
-    result = Nil;
+    dpush(env); /* escape */
+    ec2;
+    dpush(expr); /* escape */
+    ec2;
+    dpush(env);
+    ec2;
+    dpush(cdr(expr));
+    ec2;
+    rpush('A');
+    goto Evlis;
+  A:
+    indx = dpop();
+    ec2;
+    expr = dpop(); /* restore */
+    ec2;
+    env = dpop(); /* restore */
+    ec2;
+    dpush(env);
+    ec2;
+    dpush(indx);
+    ec2;
+    dpush(car(expr));
+    ec2;
+    goto Apply;
   }
-  pop();
-  pop();
-  return result;
-}
+  else
+  {
+    dpush(env);
+    ec2;
+    dpush(cdr(expr));
+    ec2;
+    dpush(car(expr));
+    ec2;
+    goto Apply;
+  }
+  goto Return;
 
-Index apply(Index func, Index args, Index env)
-{
+/***** apply *****/
+Apply:
+  func = dpop();
+  ec2;
+  args = dpop();
+  ec2;
+  env = dpop();
+  ec2;
   if (atom(func) == T)
   {
     switch (func)
     {
     case Quote:
       check_1_arg(args);
-      return car(args);
+      result = car(args);
+      break;
     case Atom:
       check_1_arg(args);
       if (atom(car(args)) == T)
-        return T;
+        result = T;
       else
-        return Nil;
+        result = Nil;
+      break;
     case Eq:
       check_2_args(args);
       if (car(args) == car(cdr(args)))
-        return T;
+        result = T;
       else
-        return Nil;
+        result = Nil;
+      break;
     case Car:
       check_1_arg(args);
       if (car(args) == Nil)
-        return error("1st item is a nil.");
+      {
+        error("1st item is a nil.");
+        goto Error;
+      }
       else if (atom(car(args)) == T)
-        return error("1st item is invalid.");
+      {
+        error("1st item is invalid.");
+        goto Error;
+      }
       else
-        return car(car(args));
+        result = car(car(args));
+      break;
     case Cdr:
       check_1_arg(args);
       if (car(args) == Nil)
-        return error("1st item is a nil.");
+      {
+        error("1st item is a nil.");
+        goto Error;
+      }
       else if (atom(car(args)) == T)
-        return error("1st item is invalid.");
+      {
+        error("1st item is invalid.");
+        goto Error;
+      }
       else
-        return cdr(car(args));
+        result = cdr(car(args));
+      break;
     case Cons:
       check_2_args(args);
-      return cons(car(args), car(cdr(args)));
+      result = cons(car(args), car(cdr(args)));
+      ec2;
+      break;
     case Cond:
       check_1_arg(args);
-      return evcon(args, env);
+      dpush(env);
+      ec2;
+      dpush(args);
+      ec2;
+      goto Evcon;
     case Rplaca:
       check_2_args(args);
-      return rplaca(car(args), car(cdr(args)));
+      result = rplaca(car(args), car(cdr(args)));
+      ec2;
+      break;
     case Rplacd:
       check_2_args(args);
-      return rplacd(car(args), car(cdr(args)));
+      result = rplacd(car(args), car(cdr(args)));
+      ec2;
+      break;
     case Eval:
       check_2_args(args);
-      return eval(car(args), car(cdr(args)));
+      dpush(car(cdr(args)));
+      ec2;
+      dpush(car(args));
+      ec2;
+      goto Eval;
     case Def:
       check_2_args(args);
-      return def(car(args), eval(car(cdr(args)), env));
+      dpush(env); /* escape */
+      ec2;
+      dpush(args); /* escape */
+      ec2;
+      dpush(env);
+      ec2;
+      dpush(car(cdr(args)));
+      ec2;
+      rpush('B');
+      ec2;
+      goto Eval;
+    B:
+      indx = dpop();
+      ec2;
+      args = dpop(); /* restore */
+      ec2;
+      env = dpop(); /* restore */
+      ec2;
+      result = def(car(args), indx);
+      break;
     case Setq:
       check_2_args(args);
-      return setq(car(args), eval(car(cdr(args)), env), env);
-    case While:
-      check_2_args(args);
-      return while_(car(args), (cdr(args)), env);
-    case DoWhile:
-      check_2_args(args);
-      return dowhile(car(args), cdr(args), env);
+      dpush(env); /* escape */
+      ec2;
+      dpush(args); /* escape */
+      ec2;
+      dpush(env);
+      ec2;
+      dpush(car(cdr(args)));
+      ec2;
+      rpush('C');
+      ec2;
+      goto Eval;
+    C:
+      indx = dpop();
+      ec2;
+      args = dpop(); /* restore */
+      ec2;
+      env = dpop(); /* restore */
+      ec2;
+      result = setq(car(args), indx, env);
+      ec2;
+      break;
+    case Begin:
+      result = Nil;
+      check_1_arg(args);
+      indx = args;
+    Loop:
+      if (atom(indx) == T)
+        break;
+      dpush(env); /* escape */
+      ec2;
+      dpush(cdr(indx)); /* escape */
+      ec2;
+      dpush(env);
+      ec2;
+      dpush(car(indx));
+      ec2;
+      rpush('D');
+      goto Eval;
+    D:
+      result = dpop();
+      ec2;
+      indx = dpop(); /* restore */
+      ec2;
+      env = dpop(); /* restore */
+      ec2;
+      goto Loop;
     case Error:
       check_2_args(args);
-      return error_(car(args), car(cdr(args)));
+      result = error_(car(args), car(cdr(args)));
+      break;
     case Num:
       check_1_arg(args);
-      return num(car(args));
+      result = num(car(args));
+      ec2;
+      break;
     case Len:
       check_1_arg(args);
-      return len(car(args));
+      result = len(car(args));
+      ec2;
+      break;
     case Gc:
       mark_and_sweep();
-      return Nil;
+      result = Nil;
+      break;
     case ImportEnv:
       check_1_arg(args);
       environment = car(args);
-      return T;
+      result = T;
+      break;
     case ExportEnv:
-      return environment;
+      result = environment;
+      break;
     case Quit:
-      return quit();
+      result = quit();
+      break;
     case Cls:
-      return cls();
+      result = cls();
+      break;
     case Read:
-      return gc_readS(1);
+      result = gc_readS(1);
+      ec2;
+      break;
     case Display:
       check_1_arg(args);
-      return display(car(args));
+      result = display(car(args));
+      break;
     case Prompt:
       check_1_arg(args);
-      return promptt(car(args));
+      result = promptt(car(args));
+      break;
     case Verbose:
       check_1_arg(args);
       if (car(args) == Nil)
       {
         display_GC = 0;
-        return Nil;
+        result = Nil;
+        break;
       }
       else
       {
         display_GC = 1;
-        return T;
+        result = T;
+        break;
       }
     default:
-      return eval(cons(cdr(assoc(func, env)), args), env);
+      dpush(env);
+      ec2;
+      dpush(cons(cdr(assoc(func, env)), args));
+      ec2;
+      goto Eval;
     }
   }
   else if (car(func) == Label)
   {
     check_2_args(cdr(func));
-    return eval(cons(car(cdr(cdr(func))), args),
-                cons(cons(car(cdr(func)), car(cdr(cdr(func)))),
-                     env));
+    dpush(cons(cons(car(cdr(func)), car(cdr(cdr(func)))), env));
+    ec2;
+    dpush(cons(car(cdr(cdr(func))), args));
+    ec2;
+    goto Eval;
   }
   else if (car(func) == Lambda)
   {
     check_1_arg(cdr(func));
-    return eval(car(cdr(cdr(func))),
-                pairlis(car(cdr(func)), args, env));
+    dpush(pairlis(car(cdr(func)), args, env));
+    ec2;
+    dpush(car(cdr(cdr(func))));
+    ec2;
+    goto Eval;
   }
   else
   {
     error_(Num2, cons(func, args));
-    return Nil;
+    err = print_no_more;
+    goto Error;
   }
+  goto Return;
+
+/***** evcon *****/
+Evcon:
+  clauses = dpop();
+  env = dpop();
+  for (; clauses != Nil; clauses = cdr(clauses))
+  {
+    if (atom(clauses) == T)
+    {
+      error("Invalid clause");
+      goto Error;
+    }
+    if (atom(car(clauses)) == T)
+    {
+      error("Invalid clause");
+      goto Error;
+    }
+    dpush(env); /* escape */
+    ec2;
+    dpush(clauses); /* escape */
+    ec2;
+    dpush(env);
+    ec2;
+    dpush(car(car(clauses)));
+    ec2;
+    rpush('E');
+    ec2;
+    goto Eval;
+  E:
+    indx = dpop();
+    ec2;
+    clauses = dpop(); /* restore */
+    ec2;
+    env = dpop(); /* restore */
+    ec2;
+    if (indx != Nil)
+    {
+      dpush(env);
+      ec2;
+      dpush(car(cdr(car(clauses))));
+      ec2;
+      goto Eval;
+    }
+  }
+  result = Nullchar; /* Meaning undefined. */
+  goto Return;
+
+/***** evlis *****/
+Evlis:
+  members = dpop();
+  ec2;
+  env = dpop();
+  ec2;
+  for (indx = Nil; members != Nil; members = cdr(members))
+  {
+    dpush(env); /* escape */
+    ec2;
+    dpush(members); /* escape */
+    ec2;
+    dpush(indx); /* escape */
+    ec2;
+    dpush(env);
+    ec2;
+    dpush(car(members));
+    ec2;
+    rpush('F');
+    ec2;
+    goto Eval;
+  F:
+    result = dpop();
+    ec2;
+    indx = dpop(); /* restore */
+    ec2;
+    indx = cons(result, indx);
+    ec2;
+    members = dpop(); /* restore */
+    ec2;
+    env = dpop(); /* restore */
+    ec2;
+  }
+  result = rev_append(indx, Nil);
+  goto Return;
+
+Error:
+  if (err == on)
+  {
+    print_error(expr, message);
+    err = print_no_more;
+  }
+  return Nil;
+
+Return:
+  dpush(result);
+  ec2;
+  expr = env = result = func = args = clauses = members = indx = Nil;
+  if (r_stack_p >= 0)
+    switch (rpop())
+    {
+    case 'A':
+      goto A;
+    case 'B':
+      goto B;
+    case 'C':
+      goto C;
+    case 'D':
+      goto D;
+    case 'E':
+      goto E;
+    case 'F':
+      goto F;
+    }
+  return dpop();
 }

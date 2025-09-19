@@ -1,5 +1,5 @@
 ;;;;; An Initial Program for UrLISP ;;;;;;
-;; Version 0.7.8
+;; Version 0.8.4
 ;; 2025 Tsugu
 ;;;;;
 
@@ -46,22 +46,8 @@ a  ; ==> 200
 (eq 'a 'a)  ; ==> t
 (eq 'a 'b)  ; ==> nil
 
-; 'while'
-; (while <condition> s1 s2 s3 ... sn)
-
-; 'do-while'
-; (do-while <condition> s1 s2 s3 ... sn)
-
-; An example. Display "*****".
-((lambda (lst)
-   (do-while
-    ()
-    (while
-     lst
-     (display '*)
-     (setq lst (cdr lst)))
-    (display '\0)))  ; a null character
- '(t t t t t))
+; 'begin'
+(begin (setq a '100) a) ; ==> 100
 
 ; Gabage Collection
 (gc)
@@ -179,11 +165,10 @@ a  ; ==> 200
 ; Add (x . y) to *env*.
 (def <<
   '(lambda (x y)
-     (do-while
-      ()
-      (rplacd *env* (cons (cons x y) (cdr *env*)))
-      (rplacd (car *env*) (cdr *env*))
-      x)))
+     (begin
+       (rplacd *env* (cons (cons x y) (cdr *env*)))
+       (rplacd (car *env*) (cdr *env*))
+       x)))
 
 ; Eval x on the environment "*env*".
 (def >> '(lambda (an_eval x) (an_eval x *env*)))
@@ -191,11 +176,10 @@ a  ; ==> 200
 ; Import an environment.
 (def importenv!
   '(lambda (env)
-     (do-while
-      ()
-      (rplacd *env* env)
-      (rplacd (car *env*) env)
-      't)))
+     (begin
+       (rplacd *env* env)
+       (rplacd (car *env*) env)
+       't)))
 
 ; Export the environment "*env*".
 (def exportenv!
@@ -205,12 +189,11 @@ a  ; ==> 200
 ; Reset the environment "*env*".
 (def resetenv!
   '(lambda ()
-     (do-while
-      ()
-      (setq
-       *env*
-       (cons (cons '*env* '()) '()))  ; '((*env*)) won't work.
-      't)))
+     (begin
+       (setq
+        *env*
+        (cons (cons '*env* '()) '()))  ; '((*env*)) won't work.
+       't)))
 
 ; The holder of the top level S-expression
 (def *top* '(()))
@@ -219,46 +202,45 @@ a  ; ==> 200
 ;
 (def repl-body
   '(lambda (an_eval exp)
-     (do-while
-      ()
-      (cond
-        ((not (atom exp))
-         (cond
-           ((eq 'importenv (car exp))
-            (display (importenv! (eval_ (cadr exp) (exportenv)))))
-           ((eq 'exportenv (car exp))
-            (display (exportenv!)))
-           ((eq 'resetenv (car exp))
-            (display (resetenv!)))
-           ((eq 'def (car exp))
-            (display (<< (cadr exp) (eval_ (caddr exp) *env*))))
-           (t (display (>> an_eval exp)))))
-        (t (display (>> an_eval exp))))
-      (display '\n))))
+     (begin
+       (cond
+         ((not (atom exp))
+          (cond
+            ((eq 'importenv (car exp))
+             (display (importenv! (eval_ (cadr exp) (exportenv)))))
+            ((eq 'exportenv (car exp))
+             (display (exportenv!)))
+            ((eq 'resetenv (car exp))
+             (display (resetenv!)))
+            ((eq 'def (car exp))
+             (display (<< (cadr exp) (eval_ (caddr exp) *env*))))
+            (t (display (>> an_eval exp)))))
+         (t (display (>> an_eval exp))))
+       (display '\n))))
 ;
 (def read-top
   '(lambda ()
-     (do-while
-      ()
-      (prompt '%)
-      (rplaca *top* (read))
-      (prompt '>)
-      '\0)))
+     (begin
+       (prompt '%)
+       (rplaca *top* (read))
+       (prompt '>)
+       '\0)))
+;
+(def repl-loop
+  '(lambda (an_eval)
+     (begin
+       (repl-body an_eval (car *top*))
+       (repl an_eval))))
 ;
 (def repl
   '(lambda args
-     ((lambda (flag)
-        (do-while
-         (not (eq flag 'ok))
-         (cond ((null args) (setq args '(eval_))))
-         (read-top)
-         (cond
-           ((atom (car *top*))
-            (repl-body (car args) (car *top*)))
-           ((eq 'exit (car (car *top*)))
-            (setq flag 'ok))
-           (t (repl-body (car args) (car *top*))))))
-      't)))
+     (begin
+       (cond ((null args) (setq args '(eval_))))
+       (read-top)
+       (cond
+         ((atom (car *top*)) (repl-loop (car args)))
+         ((eq 'exit (car (car *top*))) 'ok)
+         (t (repl-loop (car args)))))))
 
 ; ===============================================
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -316,22 +298,13 @@ a  ; ==> 200
 
 (def prog<-wolf
   '(lambda (lst terms exp)
-     (do-while
-      (not (atom exp))
-      (cond
-        ((cond ((atom (car exp)) '()) (t (eq 'label (caar exp))))
-         (do-while
-          ()
-          (setq lst (cons (cons (cadar exp) terms) lst))
-          (setq terms '())
-          (setq exp (cdr exp))))
-        (t
-         (do-while
-          ()
-          (setq lst lst)
-          (setq terms (cons (car exp) terms))
-          (setq exp (cdr exp)))))
-      lst)))
+     (cond
+       ((atom exp) lst)
+       ((cond
+          ((not (atom (car exp))) (eq 'label (caar exp)))
+          (t '()))
+        (prog<-wolf (cons (cons (cadar exp) terms) lst) '() (cdr exp)))
+       (t (prog<-wolf lst (cons (car exp) terms) (cdr exp))))))
 
 ; program counter "(label . function)"
 (def *PC* '(()))
@@ -354,20 +327,18 @@ a  ; ==> 200
 (def dpop
   '(lambda ()
      ((lambda (copy)
-        (do-while
-         ()
-         (setq *dstack* (cdr *dstack*))
-         (car copy)))
+        (begin
+          (setq *dstack* (cdr *dstack*))
+          (car copy)))
       *dstack*)))
 
 ; pop from the return stack
 (def rpop
   '(lambda ()
      ((lambda (copy)
-        (do-while
-         ()
-         (setq *rstack* (cdr *rstack*))
-         (car copy)))
+        (begin
+          (setq *rstack* (cdr *rstack*))
+          (car copy)))
       *rstack*)))
 
 ; goto
@@ -388,46 +359,39 @@ a  ; ==> 200
 ; call
 (def call
   '(lambda (func return_label)
-     (do-while
-      ()
-      (rpush (cons return_label (cdr *PC*)))
-      (setq *PC* (cons 'START func)))))
+     (begin
+       (rpush (cons return_label (cdr *PC*)))
+       (setq *PC* (cons 'START func)))))
 
 ; jump
 (def jump
   '(lambda (func)
-     (do-while
-      ()
-      (setq *PC* (cons 'START func)))))
-
+     (begin
+       (setq *PC* (cons 'START func)))))
 
 (def my_eval
   '(lambda (exp) (eval_ exp (exportenv))))
 
 (def exec
   '(lambda (terms)
-     (while (not (atom terms))
-            (my_eval (car terms))
-            (setq terms (cdr terms)))
-     'ok))
+     (cond ((atom terms) 'ok)
+           (t (begin (my_eval (car terms))
+                     (exec (cdr terms)))))))
 
 (def run
   '(lambda ()
-     (do-while
-      ()
-      (while (not (null (car *PC*)))
-             (exec
-              (cdr (assoc* (car *PC*)
-                           (my_eval (cdr *PC*))))))
-      'ok)))
+     (cond ((eq '() (car *PC*)) 'ok)
+           (t (begin
+                (exec (cdr (assoc* (car *PC*)
+                                   (my_eval (cdr *PC*)))))
+                (run))))))
 
 (def do
   '(lambda (func)
-     (do-while
-      ()
-      (call func '())
-      (run)
-      (dpop))))
+     (begin
+       (call func '())
+       (run)
+       (dpop))))
 
 ;; Stack Operations
 
@@ -461,30 +425,27 @@ a  ; ==> 200
 ; .S
 (def dotS
   '(lambda ()
-     (do-while
-      ()
-      (display *dstack*)
-      (display '\n))))
+     (begin
+       (display *dstack*)
+       (display '\n))))
 
 ; clear stacks and program counter
 (def clearsys
   '(lambda ()
-     (do-while
-      ()
-      (setq *dstack* '())
-      (setq *rstack* '())
-      (setq *PC* '(())))))
+     (begin
+       (setq *dstack* '())
+       (setq *rstack* '())
+       (setq *PC* '(())))))
 
 ;; Stack Version "eval"
 
 (def eval_s
   '(lambda (exp env)
-     (do-while
-      ()
-      (clearsys)
-      (dpush env)
-      (dpush exp)
-      (do 'eval__))))
+     (begin
+       (clearsys)
+       (dpush env)
+       (dpush exp)
+       (do 'eval__))))
 
 ; -----------------------------------------------
 ;; Pure LISP Interpreter for Stack & GOTO System

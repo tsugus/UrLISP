@@ -8,6 +8,8 @@ UrLISP is an interpreter of so-called "pure LISP".
 
 It supports "super brackets" '[', ']' to group and close brackets together.
 
+UrLISP supports TRO (tail recursion optimization).
+
 Please refer to "INIT.TXT" for usage.
 By the way, "INIT.TXT" is loaded as a sample program file at startup.
 

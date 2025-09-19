@@ -115,6 +115,16 @@ void mark_and_sweep()
     purseS(i);
   for (i = 0; i < sp; i++)
     purseS(stack[i]);
+  for (i = 0; i <= d_stack_p; i++)
+    purseS(d_stack[i]);
+  purseS(expr);
+  purseS(env);
+  purseS(result);
+  purseS(func);
+  purseS(args);
+  purseS(clauses);
+  purseS(members);
+  purseS(indx);
   /* Recycle cells with a negative tag ID to freecells. */
   for (indx = CELLS_SIZE - 2; indx > 0; indx--) /* The last cell is the "sentinel". */
   {

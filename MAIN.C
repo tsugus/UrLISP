@@ -23,6 +23,13 @@ int sp;
 Index environment;
 int display_GC;
 char prompt[PROMPT_LEN]; /* The prompt */
+/* data stack & return stack */
+Index d_stack[D_STACK_SIZE];
+int d_stack_p;
+char r_stack[R_STACK_SIZE];
+int r_stack_p;
+/* for eval() */
+Index expr, env, result, func, args, clauses, members, indx;
 
 /* Give a name to the cell with index n, make it a symbol, and register it in the table. */
 void gc_addSystemSymbol(Index n, char *name)
@@ -80,8 +87,7 @@ void initCells()
   gc_addSystemSymbol(Cond, "cond");
   gc_addSystemSymbol(Eval, "eval_");
   gc_addSystemSymbol(Error, "error");
-  gc_addSystemSymbol(While, "while");
-  gc_addSystemSymbol(DoWhile, "do-while");
+  gc_addSystemSymbol(Begin, "begin");
   gc_addSystemSymbol(Setq, "setq");
   gc_addSystemSymbol(Gc, "gc");
   gc_addSystemSymbol(ImportEnv, "importenv");
@@ -120,6 +126,8 @@ void top_loop()
       *txtp = '\0';
       continue;
     }
+    d_stack_p = -1;
+    r_stack_p = -1;
     toplevel = eval(toplevel, environment);
     if (err == off)
     {
@@ -134,7 +142,7 @@ void greeting()
   printf("\n");
   printf("\t  A Minimal Pure LISP Interpreter  \n\n");
   printf("\t            U r L I S P            \n\n");
-  printf("\t           Version 0.7.7           \n");
+  printf("\t           Version 0.8.4           \n");
   printf("\tThis software is released under the\n");
   printf("\t            MIT License.           \n\n");
   printf("\t                     (C) 2025 Tsugu\n\n");
