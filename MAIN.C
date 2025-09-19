@@ -20,7 +20,7 @@ int err;
 char *message;
 FILE *ifp;
 int sp;
-Index environment;
+Index env_array[ENV_ARRAY_SIZE]; /* The global environment array */
 int display_GC;
 char prompt[PROMPT_LEN]; /* The prompt */
 /* data stack & return stack */
@@ -64,8 +64,10 @@ void initCells()
   /* Initialization of the stack pointer for GC */
   sp = 0;
 
-  /* Initializing the environment list */
-  environment = Nil;
+  /* Initializing the global environment list */
+  /* 'env_array' is the global part of the environment list. */
+  for (i = 0; i < ENV_ARRAY_SIZE; i++)
+    env_array[i] = Nil;
 
   /* Registering 'nil' */
   tag(Nil) = Nil;
@@ -128,7 +130,7 @@ void top_loop()
     }
     d_stack_p = -1;
     r_stack_p = -1;
-    toplevel = eval(toplevel, environment);
+    toplevel = eval(toplevel, Nil);
     if (err == off)
     {
       printS(toplevel);
@@ -142,7 +144,7 @@ void greeting()
   printf("\n");
   printf("\t  A Minimal Pure LISP Interpreter  \n\n");
   printf("\t            U r L I S P            \n\n");
-  printf("\t           Version 0.8.4           \n");
+  printf("\t           Version 0.9.2           \n");
   printf("\tThis software is released under the\n");
   printf("\t            MIT License.           \n\n");
   printf("\t                     (C) 2025 Tsugu\n\n");
